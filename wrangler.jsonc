@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mas-alla-del-miedo",
+  "compatibility_date": "2025-11-26",
+  "pages_build_output_dir": "./dist",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mas-alla-del-miedo-db",
+      "database_id": "4e3ef353-1198-4cd5-b415-a70e817b0b22"
+    }
+  ]
+}
