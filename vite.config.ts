@@ -4,11 +4,10 @@ import adapter from '@hono/vite-dev-server/cloudflare'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  plugins: [
-    build(),
-    devServer({
-      adapter,
-      entry: 'src/index.tsx'
-    })
-  ]
+  // Force Vite to output into /build instead of /dist
+  build: {
+    outDir: "build",
+    emptyOutDir: true,
+  },
+  plugins: [react()],
 })
