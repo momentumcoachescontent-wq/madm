@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: your-app
+    name: your-site
     env: static
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install && npm run build
     staticPublishPath: dist
