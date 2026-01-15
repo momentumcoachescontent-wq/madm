@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: your-app
+    env: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
