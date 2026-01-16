@@ -1,4 +1,5 @@
-import { jsxRenderer } from 'hono/jsx-renderer'
+import { jsxRenderer } from 'hono/jsx-renderer';
+import React from "react"
 
 export const renderer = jsxRenderer(({ children }) => {
   return (
