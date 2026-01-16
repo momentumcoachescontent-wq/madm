@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Manejar envío de formularios de suscripción
   const subscribeForms = document.querySelectorAll('form[action="/api/subscribe"]');
-  subscribeForms.forEach(form => {
+  for (const form of subscribeForms) {
     form.addEventListener('submit', async function(e) {
       e.preventDefault();
       
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
         button.disabled = false;
         button.innerHTML = originalText;
       }
-    });
+    }
   });
   
   // Smooth scroll para enlaces internos
