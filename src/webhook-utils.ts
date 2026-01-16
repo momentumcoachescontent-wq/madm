@@ -95,8 +95,9 @@ export async function createEnrollmentFromWebhook(
   // Verificar si ya existe
   const existing = await getEnrollmentByPaymentId(db, data.paymentId, data.provider)
   if (Boolean(existing)) {
+  if (existing) {
     return existing
-  }
+  }}
 
   // Crear nueva inscripción
   const result = await db.prepare(`
