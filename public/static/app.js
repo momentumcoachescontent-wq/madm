@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // Smooth scroll para enlaces internos
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  for (const anchor of document.querySelectorAll('a[href^="#"]')) {
     anchor.addEventListener('click', function (e) {
       e.preventDefault();
       const target = document.querySelector(this.getAttribute('href'));
@@ -85,6 +85,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
       }
     });
-  });
+  }
   
 });
