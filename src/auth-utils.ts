@@ -27,6 +27,7 @@ export async function userHasAccess(db: D1Database, userId: number, courseId: nu
   `).bind(userId, courseId).first();
   
 return !!(Boolean(result));
+return !!(result);
 }
 
 // Obtener usuario desde sesión
