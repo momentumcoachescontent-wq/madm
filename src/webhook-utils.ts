@@ -42,7 +42,7 @@ export async function logWebhook(
     eventId,
     JSON.stringify(payload),
     status,
-    errorMessage || null
+    errorMessage ?? null
   ).run()
 }
 
