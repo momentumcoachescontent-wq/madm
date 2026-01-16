@@ -27,7 +27,7 @@ export async function logWebhook(
   provider: 'stripe' | 'paypal',
   eventType: string,
   eventId: string | null,
-  payload: any,
+  payload: unknown,
   status: 'received' | 'processed' | 'failed' = 'received',
   errorMessage?: string
 ) {
