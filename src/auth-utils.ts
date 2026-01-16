@@ -14,7 +14,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 // Generar token de sesión
 export function generateSessionToken(): string {
-  return `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+return "session_"+Date.now()+"_"+Math.random().toString(36).substring(2, 15);
 }
 
 // Verificar si usuario tiene acceso a un curso
@@ -26,7 +26,7 @@ export async function userHasAccess(db: D1Database, userId: number, courseId: nu
     AND access_revoked = 0
   `).bind(userId, courseId).first();
   
-  return !!result;
+return !!(Boolean(result));
 }
 
 // Obtener usuario desde sesión
