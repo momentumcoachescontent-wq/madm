@@ -14,7 +14,11 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 // Generar token de sesión
 export function generateSessionToken(): string {
-  return `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+  // Use crypto.getRandomValues for secure random number generation
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  const randomString = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  return `session_${Date.now()}_${randomString}`;
 }
 
 // Verificar si usuario tiene acceso a un curso
