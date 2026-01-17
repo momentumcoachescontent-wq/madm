@@ -10,5 +10,14 @@ export default defineConfig({
     outDir: "build",
     emptyOutDir: true,
   },
-  plugins: [react()],
+  plugins: [
+    build({
+      entry: 'src/index.tsx',
+    }),
+    devServer({
+      adapter,
+      entry: 'src/index.tsx',
+    }),
+    react()
+  ],
 })

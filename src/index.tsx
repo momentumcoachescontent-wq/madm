@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { renderer } from './renderer'
+import { admin } from './admin/routes'
 
 type Bindings = {
   DB: D1Database
@@ -17,8 +18,37 @@ const app = new Hono<{ Bindings: Bindings }>()
 // Habilitar CORS para APIs
 app.use('/api/*', cors())
 
-// Aplicar el renderer a todas las páginas
-app.use(renderer)
+// Aplicar el renderer a todas las páginas (excepto admin, que tiene su propio layout)
+app.use((c, next) => {
+  if (c.req.path.startsWith('/admin')) {
+    return next()
+  }
+  return renderer(c, next)
+})
+
+// Montar Admin
+app.route('/admin', admin)
+
+// Media Handler
+app.get('/media/:id', async (c) => {
+  const id = c.req.param('id')
+
+  const file = await c.env.DB.prepare(`
+    SELECT content_type, data FROM media_files WHERE id = ?
+  `).bind(id).first()
+
+  if (!file) {
+    return c.text('Not Found', 404)
+  }
+
+  // Convert Uint8Array/ArrayBuffer to Response
+  const data = new Uint8Array(file.data as number[])
+
+  return c.body(data.buffer, 200, {
+    'Content-Type': file.content_type as string,
+    'Cache-Control': 'public, max-age=31536000'
+  })
+})
 
 // ===== PÁGINAS =====
 
