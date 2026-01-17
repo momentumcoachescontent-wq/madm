@@ -1,5 +1,5 @@
 // Utilidades para procesamiento de webhooks
-import type { D1Database } from '@cloudflare/workers-types'
+import type { D1Database } from "@cloudflare/workers-types";
 
 /**
  * Crear tabla de logs de webhooks si no existe
