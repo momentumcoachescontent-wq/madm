@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "mas-alla-del-miedo",
+  "name": "madm",
   "compatibility_date": "2025-11-26",
   "pages_build_output_dir": "dist",
   "pages_build_command": "npm run build",
