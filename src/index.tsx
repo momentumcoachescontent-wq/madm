@@ -887,14 +887,11 @@ app.get('/comunidad', (c) => {
                 <i className="fab fa-discord"></i> Únete a Nuestro Discord
               </h2>
               <p style="font-size: 1.1rem; margin-bottom: 30px; opacity: 0.95;">
-                Acceso exclusivo para estudiantes de "Más Allá del Miedo"
+                Únete a nuestra comunidad. Contamos con una sección abierta para todos y áreas privadas exclusivas para estudiantes.
               </p>
-              <a href="/registro" className="btn btn-light btn-lg" style="background: white; color: #8b5cf6;">
-                <i className="fas fa-user-plus"></i> Crear Cuenta y Unirme
+              <a href="https://discord.gg/FWANA7Gz" target="_blank" rel="noopener noreferrer" className="btn btn-light btn-lg" style="background: white; color: #8b5cf6;">
+                <i className="fab fa-discord"></i> Unirme a la Comunidad
               </a>
-              <p style="margin-top: 20px; font-size: 0.9rem; opacity: 0.85;">
-                ¿Ya tienes cuenta? <a href="/login" style="color: white; text-decoration: underline; font-weight: 600;">Iniciar sesión</a>
-              </p>
             </div>
 
             <h2 style="text-align: center; margin-bottom: 40px;">
@@ -960,7 +957,7 @@ app.get('/comunidad', (c) => {
 
             <div className="text-center">
               <p style="color: #64748b; margin-bottom: 20px;">
-                <strong>Nota:</strong> La comunidad es exclusiva para estudiantes que han adquirido el libro o algún curso.
+                <strong>Nota:</strong> Algunas secciones son exclusivas para estudiantes que han adquirido el libro o algún curso.
               </p>
               <a href="/recursos-gratuitos" className="btn btn-secondary">
                 <i className="fas fa-gift"></i> Empezar con Recursos Gratuitos
