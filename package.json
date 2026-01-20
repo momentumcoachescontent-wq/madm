@@ -37,4 +37,7 @@
     "wrangler": "^4.4.0",
     "@vitejs/plugin-react": "^4.0.0"
   }
+  "engines": {
+  "node": ">=20.18.1"
+  }
 }
