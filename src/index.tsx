@@ -1432,7 +1432,7 @@ app.post('/api/register', async (c) => {
     const sessionToken = await createSession(c.env.DB, userId)
 
     // Establecer cookie de sesión
-    c.header('Set-Cookie', `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`)
+    c.header('Set-Cookie', `session=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`)
 
     return c.json({ 
       success: true,
@@ -1482,7 +1482,7 @@ app.post('/api/login', async (c) => {
     const sessionToken = await createSession(c.env.DB, user.id as number)
 
     // Establecer cookie
-    c.header('Set-Cookie', `session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`)
+    c.header('Set-Cookie', `session=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`)
 
     return c.json({ 
       success: true,
