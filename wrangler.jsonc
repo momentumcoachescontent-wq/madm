@@ -13,5 +13,11 @@
       "database_name": "mas-alla-del-miedo-db",
       "database_id": "4e3ef353-1198-4cd5-b415-a70e817b0b22"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMAGES_BUCKET",
+      "bucket_name": "mas-alla-del-miedo-images"
+    }
   ]
 }
