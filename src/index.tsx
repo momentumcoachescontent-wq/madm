@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { securityMiddleware } from './security-middleware'
 import { renderer } from './renderer'
 
 type Bindings = {
@@ -13,6 +14,9 @@ type Bindings = {
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
+
+// Middleware de seguridad global
+app.use('*', securityMiddleware)
 
 // Habilitar CORS para APIs
 app.use('/api/*', cors())
