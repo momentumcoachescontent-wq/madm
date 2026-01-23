@@ -230,3 +230,76 @@ export function extractCourseDataFromPayPalCustomId(customId: string): {
     courseId: parseInt(parts[1])
   }
 }
+
+/**
+ * Verificar firma de webhook de PayPal
+ */
+export async function verifyPayPalWebhookSignature(
+  env: {
+    PAYPAL_CLIENT_ID: string
+    PAYPAL_CLIENT_SECRET: string
+    PAYPAL_MODE: string
+    PAYPAL_WEBHOOK_ID: string
+  },
+  headers: Headers, // Usar Headers estándar
+  body: any
+): Promise<boolean> {
+  try {
+    const baseURL = env.PAYPAL_MODE === 'live'
+      ? 'https://api-m.paypal.com'
+      : 'https://api-m.sandbox.paypal.com'
+
+    // 1. Obtener Access Token
+    const auth = btoa(env.PAYPAL_CLIENT_ID + ':' + env.PAYPAL_CLIENT_SECRET)
+    const tokenResponse = await fetch(baseURL + '/v1/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + auth,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: 'grant_type=client_credentials'
+    })
+
+    if (!tokenResponse.ok) {
+      console.error('PayPal Token Error:', await tokenResponse.text())
+      return false
+    }
+
+    const tokenData = await tokenResponse.json() as any
+    const accessToken = tokenData.access_token
+
+    // 2. Preparar payload de verificación
+    // Mapear headers recibidos a los nombres esperados por PayPal
+    const verificationPayload = {
+      auth_algo: headers.get('paypal-auth-algo'),
+      cert_url: headers.get('paypal-cert-url'),
+      transmission_id: headers.get('paypal-transmission-id'),
+      transmission_sig: headers.get('paypal-transmission-sig'),
+      transmission_time: headers.get('paypal-transmission-time'),
+      webhook_id: env.PAYPAL_WEBHOOK_ID,
+      webhook_event: body
+    }
+
+    // 3. Llamar API de verificación
+    const verifyResponse = await fetch(baseURL + '/v1/notifications/verify-webhook-signature', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + accessToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(verificationPayload)
+    })
+
+    if (!verifyResponse.ok) {
+      console.error('PayPal Verify API Error:', await verifyResponse.text())
+      return false
+    }
+
+    const verifyData = await verifyResponse.json() as any
+    return verifyData.verification_status === 'SUCCESS'
+
+  } catch (error) {
+    console.error('Error verifying PayPal webhook:', error)
+    return false
+  }
+}
