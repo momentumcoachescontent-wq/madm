@@ -9,10 +9,10 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.post('/', async (c) => {
   try {
     const body = await c.req.parseBody()
-    const file = body['image']
+    const file = body['file'] || body['image'] // Support both for backward compatibility during transition, but prefer 'file'
 
     if (!(Boolean(file)) || !(file instanceof File)) {
-      return c.json({ error: 'No image uploaded' }, 400)
+      return c.json({ error: 'No file uploaded' }, 400)
     }
 
     // Sanitize filename
@@ -30,7 +30,7 @@ app.post('/', async (c) => {
     // We will serve these via a route /media/:key defined in the main app
     const url = "/media/"+key
 
-    return c.json({ success: true, url: url })
+    return c.json({ success: true, url: url, key: key, type: file.type })
   } catch (error) {
     console.error('Upload error:', error)
     return c.json({ error: 'Upload failed' }, 500)
