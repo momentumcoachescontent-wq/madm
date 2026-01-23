@@ -945,12 +945,12 @@ app.get('/comunidad', (c) => {
 
             <div className="cta-box" style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); padding: 50px; border-radius: 16px; text-align: center; color: white; margin-bottom: 60px;">
               <h2 style="color: white; margin-bottom: 15px;">
-                <i className="fab fa-discord"></i> Únete a Nuestro Discord
+                <i className="fab fa-discord"></i> Únete a Nuestra Comunidad
               </h2>
               <p style="font-size: 1.1rem; margin-bottom: 30px; opacity: 0.95;">
                 Únete a nuestra comunidad. Contamos con una sección abierta para todos y áreas privadas exclusivas para estudiantes.
               </p>
-              <a href="https://discord.gg/FWANA7Gz" target="_blank" rel="noopener noreferrer" className="btn btn-light btn-lg" style="background: white; color: #8b5cf6;">
+              <a href="https://discord.gg/7YZKew5Phx" target="_blank" rel="noopener noreferrer" className="btn btn-light btn-lg" style="background: white; color: #8b5cf6;">
                 <i className="fab fa-discord"></i> Unirme a la Comunidad
               </a>
             </div>
