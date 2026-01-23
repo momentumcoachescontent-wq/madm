@@ -12,6 +12,7 @@ type Bindings = {
   PAYPAL_CLIENT_ID: string
   PAYPAL_CLIENT_SECRET: string
   PAYPAL_MODE: string
+  PAYPAL_WEBHOOK_ID: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -2074,7 +2075,8 @@ app.post('/api/webhooks/paypal', async (c) => {
       getEnrollmentByPaymentId,
       processRefund,
       logWebhookTransaction,
-      extractCourseDataFromPayPalCustomId
+      extractCourseDataFromPayPalCustomId,
+      verifyPayPalWebhookSignature
     } = await import('./webhook-utils')
 
     const eventType = body.event_type
@@ -2084,8 +2086,19 @@ app.post('/api/webhooks/paypal', async (c) => {
 
     console.log('PayPal webhook received:', eventType)
 
-    // Verificar webhook con PayPal (opcional pero recomendado en producción)
-    // Por ahora confiamos en que viene de PayPal si tiene los headers correctos
+    // Verificar webhook con PayPal
+    if (c.env.PAYPAL_WEBHOOK_ID) {
+      const isValid = await verifyPayPalWebhookSignature(c.env, c.req.raw.headers, body)
+
+      if (!isValid) {
+        console.error('⚠️ PAYPAL WEBHOOK SIGNATURE VERIFICATION FAILED')
+        // En soft-rollout continuamos, pero logueamos el error
+      } else {
+        console.log('✅ PayPal webhook signature verified')
+      }
+    } else {
+      console.warn('⚠️ PAYPAL_WEBHOOK_ID not set, skipping signature verification')
+    }
 
     // Procesar eventos según tipo
     switch (eventType) {
