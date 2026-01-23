@@ -1394,10 +1394,20 @@ app.post('/api/subscribe', async (c) => {
         resource_requested = excluded.resource_requested
     `).bind(name, email, resource || 'general').run()
 
+    // Mapa de recursos disponibles
+    const resources: Record<string, string> = {
+      'test-limites': '/downloads/test-limites.pdf',
+      '7-senales': '/downloads/7-senales.pdf',
+      'checklist-limites': '/downloads/checklist-limites.pdf',
+      'audio-respiracion': '/downloads/audio-respiracion.mp3'
+    }
+
+    const downloadUrl = resource && typeof resource === 'string' ? resources[resource] : null
+
     return c.json({ 
       success: true,
       message: 'Gracias por suscribirte. Recibirás el recurso en tu email.',
-      downloadUrl: `/downloads/${resource}.pdf` // URL ficticia por ahora
+      downloadUrl
     })
   } catch (error) {
     console.error('Error al guardar suscriptor:', error)
