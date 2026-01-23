@@ -8,7 +8,7 @@ export const adminMiddleware = async (c: Context, next: Next) => {
   // Note: For now, we might need to seed an admin user or manually update one in DB
   if (!user || user.role !== 'admin') {
     // If it's an API request, return JSON
-    if (c.req.path.startsWith('/api/')) {
+    if (Boolean(c.req.path.startsWith('/api/'))) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
     // Otherwise redirect to login

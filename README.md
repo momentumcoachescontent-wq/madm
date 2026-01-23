@@ -14,16 +14,16 @@
 ## 🚀 URLs del Proyecto
 
 ### ✨ Producción (Cloudflare Pages)
-- **🌐 URL Principal**: https://cab283a2.mas-alla-del-miedo.pages.dev
-- **🌐 URL Alternativa**: https://mas-alla-del-miedo.pages.dev
+- **🌐 URL Principal**: <https://cab283a2.mas-alla-del-miedo.pages.dev>
+- **🌐 URL Alternativa**: <https://mas-alla-del-miedo.pages.dev>
 - **Estado**: ✅ **ACTIVO Y DESPLEGADO**
 - **CDN Global**: Cloudflare Edge Network
 - **Base de Datos**: D1 (SQLite global)
 - **Última Actualización**: 2024-12-29
 
 ### Desarrollo Local (Sandbox)
-- **URL Sandbox**: https://3000-i5ufb1dp5fddctw1qd1fo-82b888ba.sandbox.novita.ai
-- **Puerto Local**: http://localhost:3000
+- **URL Sandbox**: <https://3000-i5ufb1dp5fddctw1qd1fo-82b888ba.sandbox.novita.ai>
+- **Puerto Local**: <http://localhost:3000>
 
 ### Páginas Implementadas (Fase 1 + Fase 2 + Fase 3 + Fase 4)
 ✅ **Inicio** (`/`) - Hero principal con propuesta de valor  
@@ -98,7 +98,7 @@
 4. **Inteligencia Emocional Práctica** (4 lecciones) - $79.99
 
 ### 👤 Usuario Demo
-- **Email**: demo@masalladelmiedo.com
+- **Email**: <demo@masalladelmiedo.com>
 - **Contraseña**: demo123
 - **Cursos inscritos**: Todos (4 cursos, 20 lecciones)
 - **Estado de pago**: Completado
@@ -319,7 +319,7 @@ curl https://mas-alla-del-miedo.pages.dev
 
 ### ✅ Producción
 - **Plataforma**: Cloudflare Pages
-- **URL**: https://mas-alla-del-miedo.pages.dev
+- **URL**: <https://mas-alla-del-miedo.pages.dev>
 - **Base de Datos**: D1 (ID: 4e3ef353-1198-4cd5-b415-a70e817b0b22)
 - **Status**: ✅ **DESPLEGADO Y ACTIVO**
 - **Branch**: main
@@ -327,7 +327,7 @@ curl https://mas-alla-del-miedo.pages.dev
 
 ### 🔧 Desarrollo
 - **Entorno**: Sandbox
-- **URL**: https://3000-i5ufb1dp5fddctw1qd1fo-82b888ba.sandbox.novita.ai
+- **URL**: <https://3000-i5ufb1dp5fddctw1qd1fo-82b888ba.sandbox.novita.ai>
 - **Status**: ✅ Activo
 
 ---
@@ -389,7 +389,7 @@ El libro "Más Allá del Miedo" por Ernesto Alvarez incluye:
 
 Este proyecto está en desarrollo activo. Para dudas o sugerencias:
 
-- **Email**: soporte@masalladelmiedo.com (pendiente configurar)
+- **Email**: <soporte@masalladelmiedo.com> (pendiente configurar)
 - **Repositorio**: (pendiente configurar GitHub)
 
 ---

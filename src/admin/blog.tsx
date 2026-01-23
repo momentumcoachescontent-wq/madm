@@ -8,7 +8,7 @@ type Bindings = {
 const app = new Hono<{ Bindings: Bindings }>()
 
 // Helper for Admin Layout (simplified)
-const AdminLayout = (children: any, title: string) => html`
+const AdminLayout = (children: unknown, title: string) => html`
   <div class="admin-container" style="padding: 20px;">
     <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
       <h1>${title}</h1>
@@ -21,13 +21,13 @@ const AdminLayout = (children: any, title: string) => html`
 `
 
 // Helper: Form View
-const PostForm = (post: any = {}) => {
-  const isEdit = !!post.id
-  const action = isEdit ? `/admin/blog/${post.id}` : '/admin/blog'
+const PostForm = (post: unknown = {}) => {
+  const isEdit = !!(Boolean(post.id))
+  const action = isEdit ? "/admin/blog/"+post.id : '/admin/blog'
 
   // Format date for datetime-local input (YYYY-MM-DDThh:mm)
   let scheduledAt = ''
-  if (post.scheduled_at) {
+  if (Boolean(post.scheduled_at)) {
     const d = new Date(post.scheduled_at)
     scheduledAt = d.toISOString().slice(0, 16)
   }
@@ -44,12 +44,12 @@ const PostForm = (post: any = {}) => {
     <form method="POST" action="${action}" id="postForm" enctype="multipart/form-data">
       <div class="form-group">
         <label>Título</label>
-        <input type="text" name="title" value="${post.title || ''}" required>
+        <input type="text" name="title" .value="${post.title || ''}" required>
       </div>
 
       <div class="form-group">
         <label>Slug (URL)</label>
-        <input type="text" name="slug" value="${post.slug || ''}" required>
+        <input type="text" name="slug" value="${(Boolean(post.slug)) || ''}" required>
       </div>
 
       <div class="form-group">
