@@ -226,7 +226,7 @@ Una vez configurado el proyecto en Cloudflare Pages, puedes conectarlo a GitHub 
 
 #### 1. Conectar GitHub en Cloudflare Dashboard
 
-1. Ir a https://dash.cloudflare.com
+1. Ir a <https://dash.cloudflare.com>
 2. Pages → mas-alla-del-miedo → Settings → Builds & deployments
 3. Click en "Connect to Git"
 4. Autorizar GitHub
@@ -476,7 +476,7 @@ Si encuentras problemas:
    - `pm2 logs webapp` (desarrollo local)
 
 3. **Buscar en issues**:
-   - https://github.com/momentumcoachescontent-wq/masalladelmiedo/issues
+   - <https://github.com/momentumcoachescontent-wq/masalladelmiedo/issues>
 
 4. **Crear issue**:
    - Usar template de bug report

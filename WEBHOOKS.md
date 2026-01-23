@@ -111,8 +111,8 @@ npx wrangler d1 execute mas-alla-del-miedo-db --remote \
 ## ⚙️ Configuración en Stripe
 
 ### 1. Acceder al Dashboard de Stripe
-- **Test Mode**: https://dashboard.stripe.com/test/webhooks
-- **Live Mode**: https://dashboard.stripe.com/webhooks
+- **Test Mode**: <https://dashboard.stripe.com/test/webhooks>
+- **Live Mode**: <https://dashboard.stripe.com/webhooks>
 
 ### 2. Crear Webhook Endpoint
 
@@ -151,8 +151,8 @@ npx wrangler pages secret put STRIPE_WEBHOOK_SECRET --project-name mas-alla-del-
 ## ⚙️ Configuración en PayPal
 
 ### 1. Acceder al Dashboard de PayPal
-- **Sandbox**: https://developer.paypal.com/dashboard/applications/sandbox
-- **Live**: https://developer.paypal.com/dashboard/applications/live
+- **Sandbox**: <https://developer.paypal.com/dashboard/applications/sandbox>
+- **Live**: <https://developer.paypal.com/dashboard/applications/live>
 
 ### 2. Configurar Webhooks
 

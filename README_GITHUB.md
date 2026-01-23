@@ -10,10 +10,10 @@ Plataforma educativa completa (LMS) enfocada en desarrollo emocional, psicologí
 
 ## 🚀 URLs de Producción
 
-- **🌐 Sitio Principal**: https://fb2b3a67.mas-alla-del-miedo.pages.dev
-- **📚 Cursos**: https://fb2b3a67.mas-alla-del-miedo.pages.dev/cursos
-- **📝 Blog**: https://fb2b3a67.mas-alla-del-miedo.pages.dev/blog
-- **🔐 Demo Login**: https://fb2b3a67.mas-alla-del-miedo.pages.dev/login
+- **🌐 Sitio Principal**: <https://fb2b3a67.mas-alla-del-miedo.pages.dev>
+- **📚 Cursos**: <https://fb2b3a67.mas-alla-del-miedo.pages.dev/cursos>
+- **📝 Blog**: <https://fb2b3a67.mas-alla-del-miedo.pages.dev/blog>
+- **🔐 Demo Login**: <https://fb2b3a67.mas-alla-del-miedo.pages.dev/login>
   - Usuario: `demo@masalladelmiedo.com`
   - Contraseña: `demo123`
 
@@ -185,8 +185,8 @@ npm run dev:sandbox
 ```
 
 ### **Acceder al Sitio Local**
-- **URL**: http://localhost:3000
-- **Usuario Demo**: demo@masalladelmiedo.com / demo123
+- **URL**: <http://localhost:3000>
+- **Usuario Demo**: <demo@masalladelmiedo.com> / demo123
 
 ### **Comandos Útiles**
 ```bash
@@ -465,9 +465,9 @@ Este es un proyecto propietario. El código no puede ser copiado, modificado o d
 
 ## 📧 Contacto
 
-- **Website**: https://fb2b3a67.mas-alla-del-miedo.pages.dev
-- **Email**: soporte@masalladelmiedo.com (pendiente configurar)
-- **GitHub**: https://github.com/momentumcoachescontent-wq/masalladelmiedo
+- **Website**: <https://fb2b3a67.mas-alla-del-miedo.pages.dev>
+- **Email**: <soporte@masalladelmiedo.com> (pendiente configurar)
+- **GitHub**: <https://github.com/momentumcoachescontent-wq/masalladelmiedo>
 
 ---
 

@@ -166,7 +166,7 @@ CREATE TABLE payment_transactions (
 ### PayPal Sandbox
 Usa las credenciales de sandbox de tu cuenta de desarrollador de PayPal.
 
-**URL de sandbox**: https://www.sandbox.paypal.com
+**URL de sandbox**: <https://www.sandbox.paypal.com>
 
 ---
 
@@ -184,12 +184,12 @@ npx wrangler d1 execute mas-alla-del-miedo-db --remote \
 ```
 
 ### Dashboard de Stripe
-- **Test Mode**: https://dashboard.stripe.com/test/payments
-- **Live Mode**: https://dashboard.stripe.com/payments
+- **Test Mode**: <https://dashboard.stripe.com/test/payments>
+- **Live Mode**: <https://dashboard.stripe.com/payments>
 
 ### Dashboard de PayPal
-- **Sandbox**: https://www.sandbox.paypal.com
-- **Live**: https://www.paypal.com
+- **Sandbox**: <https://www.sandbox.paypal.com>
+- **Live**: <https://www.paypal.com>
 
 ---
 

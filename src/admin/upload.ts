@@ -11,13 +11,13 @@ app.post('/', async (c) => {
     const body = await c.req.parseBody()
     const file = body['image']
 
-    if (!file || !(file instanceof File)) {
+    if (!(Boolean(file)) || !(file instanceof File)) {
       return c.json({ error: 'No image uploaded' }, 400)
     }
 
     // Sanitize filename
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const key = `${Date.now()}-${sanitizedName}`
+    const key = ""+Date.now()+"-"+sanitizedName
 
     // Upload to R2
     await c.env.IMAGES_BUCKET.put(key, file.stream(), {
@@ -28,9 +28,9 @@ app.post('/', async (c) => {
 
     // Return URL.
     // We will serve these via a route /media/:key defined in the main app
-    const url = `/media/${key}`
+    const url = "/media/"+key
 
-    return c.json({ success: true, url })
+    return c.json({ success: true, url: url })
   } catch (error) {
     console.error('Upload error:', error)
     return c.json({ error: 'Upload failed' }, 500)
