@@ -1,13 +1,28 @@
 -- ===== SEED COMPLETO PARA PRODUCCIÓN =====
 -- Este script configura todos los datos necesarios para una demostración completa
 
--- ===== 1. USUARIO DEMO =====
-INSERT OR IGNORE INTO users (email, name, password_hash, role, active)
-VALUES ('demo@masalladelmiedo.com', 'Usuario Demo', '$2b$10$lDrSJBK.rNAn7o4lyJD1hOWzgtakuJEPlqi/zSdqjCykBgCeGrfYm', 'student', 1);
+-- ===== 1. USUARIOS =====
+
+-- 1.1 ADMIN USER
+INSERT OR IGNORE INTO users (email, name, password_hash, role, active, email_verified)
+VALUES ('admin@masalladelmiedo.com', 'Administrador', '$2b$10$Pmyf7BAEDXMB46d6UhqVQ.wkd/Czlr.IZk4qrItGgZ7DSPzCHJks6', 'admin', 1, 1);
+
+-- Actualizar si ya existe
+UPDATE users
+SET password_hash = '$2b$10$Pmyf7BAEDXMB46d6UhqVQ.wkd/Czlr.IZk4qrItGgZ7DSPzCHJks6',
+    role = 'admin',
+    active = 1
+WHERE email = 'admin@masalladelmiedo.com';
+
+-- 1.2 DEMO USER
+INSERT OR IGNORE INTO users (email, name, password_hash, role, active, email_verified)
+VALUES ('demo@masalladelmiedo.com', 'Usuario Demo', '$2b$10$wx8F98Bxod005nGUqQWxHeZC0xv8nOvOABx7zZErOlEAys8y.6Poa', 'student', 1, 1);
 
 -- Actualizar password si ya existe
 UPDATE users 
-SET password_hash = '$2b$10$lDrSJBK.rNAn7o4lyJD1hOWzgtakuJEPlqi/zSdqjCykBgCeGrfYm'
+SET password_hash = '$2b$10$wx8F98Bxod005nGUqQWxHeZC0xv8nOvOABx7zZErOlEAys8y.6Poa',
+    role = 'student',
+    active = 1
 WHERE email = 'demo@masalladelmiedo.com';
 
 -- ===== 2. CURSOS =====
