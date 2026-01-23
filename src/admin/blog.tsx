@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
+import { VersioningService, Version } from '../lib/versioning'
 
 type Bindings = {
   DB: D1Database
@@ -7,13 +8,13 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>()
 
-// Helper for Admin Layout (simplified)
+// Helper for Admin Layout
 const AdminLayout = (children: unknown, title: string) => html`
   <div class="admin-container" style="padding: 20px;">
     <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
       <h1>${title}</h1>
-      <a href="/admin" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> Volver al Dashboard
+      <a href="/admin/blog" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Volver al Listado
       </a>
     </div>
     ${children}
@@ -21,7 +22,7 @@ const AdminLayout = (children: unknown, title: string) => html`
 `
 
 // Helper: Form View
-const PostForm = (post: unknown = {}) => {
+const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any = null) => {
   const isEdit = !!(Boolean(post.id))
   const action = isEdit ? "/admin/blog/"+post.id : '/admin/blog'
 
@@ -39,12 +40,30 @@ const PostForm = (post: unknown = {}) => {
       .form-group { margin-bottom: 15px; }
       label { display: block; margin-bottom: 5px; font-weight: bold; }
       input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+      .alert { padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+      .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+      .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
+      .badge-draft { background: #e2e8f0; color: #475569; }
+      .badge-published { background: #dcfce7; color: #166534; }
     </style>
+
+    ${isDraft ? html`
+      <div class="alert alert-warning">
+        <strong><i class="fas fa-exclamation-triangle"></i> Modo Borrador</strong><br>
+        Estás editando un borrador no publicado (guardado el ${new Date(post.created_at || post.updated_at).toLocaleString()}).
+        <br>
+        <div style="margin-top: 10px;">
+            <a href="/admin/blog/${post.id}/discard-draft" class="btn btn-sm btn-outline" style="color: #856404; border-color: #856404;" onclick="return confirm('¿Estás seguro? Se perderán los cambios del borrador actual.')">
+                Descartar cambios y volver a versión publicada
+            </a>
+        </div>
+      </div>
+    ` : ''}
 
     <form method="POST" action="${action}" id="postForm" enctype="multipart/form-data">
       <div class="form-group">
         <label>Título</label>
-        <input type="text" name="title" .value="${post.title || ''}" required>
+        <input type="text" name="title" value="${post.title || ''}" required>
       </div>
 
       <div class="form-group">
@@ -81,23 +100,29 @@ const PostForm = (post: unknown = {}) => {
 
       <div style="display: flex; gap: 20px;">
         <div class="form-group" style="flex: 1;">
-          <label>Estado</label>
-          <select name="published">
-            <option value="0" ${!post.published ? 'selected' : ''}>Borrador</option>
-            <option value="1" ${post.published ? 'selected' : ''}>Publicado</option>
-          </select>
-        </div>
-
-        <div class="form-group" style="flex: 1;">
           <label>Programar Publicación</label>
           <input type="datetime-local" name="scheduled_at" value="${scheduledAt}">
-          <small>Dejar vacío para publicar inmediatamente (si el estado es Publicado)</small>
+          <small>Solo aplica al Publicar.</small>
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-lg">
-        <i class="fas fa-save"></i> Guardar Post
-      </button>
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; display: flex; gap: 15px; align-items: center;">
+        <button type="submit" name="action" value="draft" class="btn btn-secondary btn-lg">
+          <i class="fas fa-save"></i> Guardar Borrador
+        </button>
+
+        <button type="submit" name="action" value="publish" class="btn btn-primary btn-lg">
+          <i class="fas fa-paper-plane"></i> Publicar Cambios
+        </button>
+
+        <span style="color: #64748b; margin-left: auto;">
+            ${isEdit ? html`Estado actual:
+                ${post.published
+                    ? html`<span class="badge badge-published">Publicado</span>`
+                    : html`<span class="badge badge-draft">Borrador</span>`}`
+            : ''}
+        </span>
+      </div>
     </form>
 
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
@@ -268,6 +293,95 @@ app.get('/new', (c) => {
   return c.render(AdminLayout(PostForm(), 'Crear Nuevo Post'))
 })
 
+// VIEW VERSION / DIFF
+app.get('/versions/:versionId', async (c) => {
+    const versionId = c.req.param('versionId')
+    const versioning = new VersioningService(c.env.DB)
+    const version = await versioning.getVersion('blog_post', parseInt(versionId))
+
+    if (!version) return c.notFound()
+
+    // Fetch live post for comparison
+    const post = await c.env.DB.prepare('SELECT * FROM blog_posts WHERE id = ?').bind(version['post_id']).first()
+
+    // Calculate Diff
+    const diffContent = versioning.compareText(post?.content as string || '', version.content || '')
+
+    return c.render(AdminLayout(html`
+        <style>
+            .diff-container { background: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
+            .version-meta { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        </style>
+
+        <div class="diff-container">
+            <div class="version-meta">
+                <h2>Versión del ${new Date(version.created_at).toLocaleString()}</h2>
+                <span class="badge" style="background: ${version.status === 'published' ? '#dcfce7' : '#e2e8f0'}">
+                    ${version.status.toUpperCase()}
+                </span>
+                <p><strong>Resumen de cambios:</strong> ${version.change_summary || 'N/A'}</p>
+
+                <div style="margin-top: 15px;">
+                    <form method="POST" action="/admin/blog/versions/${version.id}/restore" style="display: inline;">
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('¿Restaurar esta versión? Se creará un nuevo borrador.')">
+                            <i class="fas fa-undo"></i> Restaurar como Borrador
+                        </button>
+                    </form>
+                    <a href="/admin/blog/${version['post_id']}/edit" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </div>
+
+            <h3>Comparación con versión actual (Live)</h3>
+            <div style="margin-top: 10px; border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #f9f9f9;">
+                ${raw(diffContent)}
+            </div>
+        </div>
+    `, 'Ver Versión'))
+})
+
+// RESTORE VERSION
+app.post('/versions/:versionId/restore', async (c) => {
+    const versionId = c.req.param('versionId')
+    const versioning = new VersioningService(c.env.DB)
+
+    try {
+        const version = await versioning.getVersion('blog_post', parseInt(versionId))
+        if (!version) return c.notFound()
+
+        await versioning.restoreVersion('blog_post', version['post_id'], parseInt(versionId))
+        return c.redirect(`/admin/blog/${version['post_id']}/edit`)
+    } catch (e) {
+        return c.text('Error restoring version: ' + (e as Error).message, 500)
+    }
+})
+
+// DISCARD DRAFT
+app.get('/:id/discard-draft', async (c) => {
+    const id = c.req.param('id')
+
+    // Delete ALL versions with status='draft' for this post
+    await c.env.DB.prepare('DELETE FROM blog_post_versions WHERE post_id = ? AND status = ?').bind(id, 'draft').run()
+
+    return c.redirect(`/admin/blog/${id}/edit`)
+})
+
+// DELETE VERSION
+app.post('/versions/:versionId/delete', async (c) => {
+    const versionId = c.req.param('versionId')
+    const versioning = new VersioningService(c.env.DB)
+
+    try {
+        const version = await versioning.getVersion('blog_post', parseInt(versionId))
+        if (!version) return c.notFound()
+
+        await versioning.deleteVersion('blog_post', parseInt(versionId))
+        return c.redirect(`/admin/blog/${version['post_id']}/edit`)
+    } catch (e) {
+        return c.text('Error deleting version: ' + (e as Error).message, 500)
+    }
+})
+
+
 // EDIT FORM
 app.get('/:id/edit', async (c) => {
   const id = c.req.param('id')
@@ -275,34 +389,66 @@ app.get('/:id/edit', async (c) => {
 
   if (!post) return c.notFound()
 
-  // Fetch versions
-  const versions = await c.env.DB.prepare(`
-    SELECT id, created_at, title
-    FROM blog_post_versions
-    WHERE post_id = ?
-    ORDER BY created_at DESC
-    LIMIT 10
-  `).bind(id).all()
+  const versioning = new VersioningService(c.env.DB)
+  const versions = await versioning.getVersions('blog_post', parseInt(id))
+
+  // Check for latest draft
+  let workingCopy = post
+  let isDraft = false
+
+  if (versions.length > 0) {
+      const latest = versions[0]
+      // Logic: if latest version is a draft, use it.
+      if (latest.status === 'draft') {
+          workingCopy = { ...post, ...latest, id: post.id } // keep original ID but overlay version data
+          isDraft = true
+      }
+  }
 
   const VersionsList = html`
     <div style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
       <h3>Historial de Versiones</h3>
-      <ul style="list-style: none; padding: 0;">
-        ${versions.results?.map((v: any) => html`
-          <li style="padding: 10px; border-bottom: 1px solid #eee;">
-            <i class="fas fa-history"></i>
-            <strong>${new Date(v.created_at).toLocaleString()}</strong>
-            <br>
-            <small>${v.title}</small>
-            <!-- Here we could add a "View" or "Restore" button if needed later -->
-          </li>
-        `)}
-      </ul>
+      <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; text-align: left;">
+                    <th style="padding: 10px;">Fecha</th>
+                    <th style="padding: 10px;">Estado</th>
+                    <th style="padding: 10px;">Cambios</th>
+                    <th style="padding: 10px; text-align: right;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            ${versions.map((v: any) => html`
+              <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px;">${new Date(v.created_at).toLocaleString()}</td>
+                <td style="padding: 10px;">
+                    ${v.status === 'published'
+                        ? html`<span class="badge badge-published">Publicado</span>`
+                        : html`<span class="badge badge-draft">Borrador</span>`
+                    }
+                </td>
+                <td style="padding: 10px; color: #64748b;">${v.change_summary || '-'}</td>
+                <td style="padding: 10px; text-align: right;">
+                    <a href="/admin/blog/versions/${v.id}" class="btn btn-sm btn-outline" title="Ver / Restaurar">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    <form method="POST" action="/admin/blog/versions/${v.id}/delete" style="display:inline;" onsubmit="return confirm('¿Eliminar esta versión permanentemente?')">
+                        <button type="submit" class="btn btn-sm btn-outline" style="color: #ef4444; border-color: #ef4444; margin-left: 5px;" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                </td>
+              </tr>
+            `)}
+            </tbody>
+        </table>
+      </div>
     </div>
   `
 
   return c.render(AdminLayout(html`
-    ${PostForm(post)}
+    ${PostForm(workingCopy, isDraft)}
     ${VersionsList}
   `, 'Editar Post'))
 })
@@ -310,6 +456,7 @@ app.get('/:id/edit', async (c) => {
 // CREATE ACTION
 app.post('/', async (c) => {
   const body = await c.req.parseBody()
+  const action = body['action'] as string // 'draft' or 'publish'
 
   const title = body['title'] as string
   const slug = body['slug'] as string
@@ -317,22 +464,27 @@ app.post('/', async (c) => {
   const excerpt = body['excerpt'] as string
   const image_url = body['image_url'] as string
   const hashtags = body['hashtags'] as string
-  const published = body['published'] === '1' ? 1 : 0
+  // If publishing, set published=1. If draft, published=0.
+  // NOTE: For a NEW post, "Save Draft" means creating the post but not publishing it.
+  const published = action === 'publish' ? 1 : 0
   const scheduled_at = body['scheduled_at'] ? body['scheduled_at'] : null
 
+  const versioning = new VersioningService(c.env.DB)
+
   try {
+    // 1. Create the main record (always needed for ID)
     const res = await c.env.DB.prepare(`
       INSERT INTO blog_posts (title, slug, content, excerpt, image_url, hashtags, published, scheduled_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `).bind(title, slug, content, excerpt, image_url, hashtags, published, scheduled_at).run()
 
-    const postId = res.meta.last_row_id
+    const postId = res.meta.last_row_id as number
 
-    // Create initial version
-    await c.env.DB.prepare(`
-      INSERT INTO blog_post_versions (post_id, title, content, excerpt, image_url)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(postId, title, content, excerpt, image_url).run()
+    // 2. Create the initial version
+    const versionStatus = action === 'publish' ? 'published' : 'draft'
+    await versioning.createVersion('blog_post', postId, {
+        title, content, excerpt, image_url
+    }, versionStatus)
 
     return c.redirect('/admin/blog')
   } catch (error) {
@@ -344,6 +496,7 @@ app.post('/', async (c) => {
 app.post('/:id', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.parseBody()
+  const action = body['action'] as string // 'draft' or 'publish'
 
   const title = body['title'] as string
   const slug = body['slug'] as string
@@ -351,26 +504,37 @@ app.post('/:id', async (c) => {
   const excerpt = body['excerpt'] as string
   const image_url = body['image_url'] as string
   const hashtags = body['hashtags'] as string
-  const published = body['published'] === '1' ? 1 : 0
   const scheduled_at = body['scheduled_at'] ? body['scheduled_at'] : null
 
+  const versioning = new VersioningService(c.env.DB)
+
   try {
-    // Save version first (save the NEW state as a version, or old state?
-    // Requirement says "Versioning of content". Typically we save the state being saved.
+      // Get current live state to calculate summary if needed
+      const currentLive = await c.env.DB.prepare('SELECT * FROM blog_posts WHERE id = ?').bind(id).first()
 
-    await c.env.DB.prepare(`
-      UPDATE blog_posts
-      SET title = ?, slug = ?, content = ?, excerpt = ?, image_url = ?, hashtags = ?, published = ?, scheduled_at = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).bind(title, slug, content, excerpt, image_url, hashtags, published, scheduled_at, id).run()
+      if (action === 'publish') {
+        // Update Live
+        await c.env.DB.prepare(`
+            UPDATE blog_posts
+            SET title = ?, slug = ?, content = ?, excerpt = ?, image_url = ?, hashtags = ?, published = 1, scheduled_at = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).bind(title, slug, content, excerpt, image_url, hashtags, scheduled_at, id).run()
 
-    // Insert version
-    await c.env.DB.prepare(`
-      INSERT INTO blog_post_versions (post_id, title, content, excerpt, image_url)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(id, title, content, excerpt, image_url).run()
+        // Create Published Version
+        await versioning.createVersion('blog_post', parseInt(id), {
+            title, content, excerpt, image_url
+        }, 'published')
 
-    return c.redirect('/admin/blog')
+      } else {
+        // Save Draft ONLY (do not update main table content)
+        // Note: we might want to update updated_at? No, let's leave main table untouched so users know when it was last published.
+
+        await versioning.createVersion('blog_post', parseInt(id), {
+            title, content, excerpt, image_url
+        }, 'draft')
+      }
+
+    return c.redirect('/admin/blog/' + id + '/edit')
   } catch (error) {
     return c.text('Error updating post: ' + (error as Error).message, 500)
   }
