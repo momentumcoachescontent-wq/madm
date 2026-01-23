@@ -3,6 +3,7 @@ import { html } from 'hono/html'
 import { adminMiddleware } from '../middleware/admin'
 import blogApp from './blog'
 import uploadApp from './upload'
+import mediaApp from './media'
 
 // Define Bindings if needed for types, though usually generic is enough for composition
 const app = new Hono()
@@ -33,15 +34,17 @@ app.get('/', (c) => {
           </div>
         </a>
 
-        <!-- Media Card (Placeholder) -->
-        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #10b981; opacity: 0.7;">
-          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
-            <i class="fas fa-images fa-3x" style="color: #10b981;"></i>
-            <span style="background: #ecfdf5; color: #10b981; padding: 5px 12px; border-radius: 20px; font-weight: 600;">Media</span>
+        <!-- Media Card -->
+        <a href="/admin/media" style="text-decoration: none; color: inherit;">
+          <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; height: 100%; border-left: 5px solid #10b981;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+              <i class="fas fa-images fa-3x" style="color: #10b981;"></i>
+              <span style="background: #ecfdf5; color: #10b981; padding: 5px 12px; border-radius: 20px; font-weight: 600;">Media</span>
+            </div>
+            <h2 style="font-size: 1.5rem; margin-bottom: 10px; color: #1e293b;">Biblioteca Multimedia</h2>
+            <p style="color: #64748b;">Gestionar imágenes, documentos y archivos.</p>
           </div>
-          <h2 style="font-size: 1.5rem; margin-bottom: 10px; color: #1e293b;">Biblioteca Multimedia</h2>
-          <p style="color: #64748b;">Gestionar imágenes y archivos (Integrado en Editor).</p>
-        </div>
+        </a>
 
         <!-- Users Card (Placeholder) -->
         <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #f59e0b; opacity: 0.7;">
@@ -73,5 +76,6 @@ app.get('/', (c) => {
 // Mount sub-apps
 app.route('/blog', blogApp)
 app.route('/upload', uploadApp)
+app.route('/media', mediaApp)
 
 export default app

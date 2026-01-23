@@ -138,7 +138,7 @@ const PostForm = (post: unknown = {}) => {
 
       async function uploadAndInsertImage(file) {
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('file', file);
 
         try {
           const response = await fetch('/admin/upload', {
@@ -163,7 +163,7 @@ const PostForm = (post: unknown = {}) => {
         if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
           const formData = new FormData();
-          formData.append('image', file);
+          formData.append('file', file);
 
           try {
             const btn = document.querySelector('label[for="imageUpload"]');
