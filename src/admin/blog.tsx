@@ -27,10 +27,15 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
   const action = isEdit ? "/admin/blog/"+post.id : '/admin/blog'
 
   // Format date for datetime-local input (YYYY-MM-DDThh:mm)
-  let scheduledAt = ''
+  // We keep this variable to pass the UTC string to the hidden input and JS
+  let scheduledAtUtc = ''
+  let isScheduled = false
   if (Boolean(post.scheduled_at)) {
-    const d = new Date(post.scheduled_at)
-    scheduledAt = d.toISOString().slice(0, 16)
+    // This is already UTC from DB
+    scheduledAtUtc = post.scheduled_at.replace(' ', 'T').slice(0, 19)
+    if (new Date(scheduledAtUtc) > new Date()) {
+      isScheduled = true
+    }
   }
 
   return html`
@@ -45,6 +50,7 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
       .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
       .badge-draft { background: #e2e8f0; color: #475569; }
       .badge-published { background: #dcfce7; color: #166534; }
+      .badge-scheduled { background: #dbeafe; color: #1e40af; }
     </style>
 
     ${isDraft ? html`
@@ -100,9 +106,10 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
 
       <div style="display: flex; gap: 20px;">
         <div class="form-group" style="flex: 1;">
-          <label>Programar Publicación</label>
-          <input type="datetime-local" name="scheduled_at" value="${scheduledAt}">
-          <small>Solo aplica al Publicar.</small>
+          <label>Programar Publicación (Tu hora local)</label>
+          <input type="datetime-local" name="scheduled_at_local" id="scheduledAtLocalInput">
+          <input type="hidden" name="scheduled_at" id="scheduledAtHiddenInput" value="${scheduledAtUtc}">
+          <small>Si seleccionas una fecha futura, el post se programará automáticamente.</small>
         </div>
       </div>
 
@@ -111,14 +118,16 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
           <i class="fas fa-save"></i> Guardar Borrador
         </button>
 
-        <button type="submit" name="action" value="publish" class="btn btn-primary btn-lg">
+        <button type="submit" name="action" value="publish" id="publishBtn" class="btn btn-primary btn-lg">
           <i class="fas fa-paper-plane"></i> Publicar Cambios
         </button>
 
         <span style="color: #64748b; margin-left: auto;">
             ${isEdit ? html`Estado actual:
                 ${post.published
-                    ? html`<span class="badge badge-published">Publicado</span>`
+                    ? (isScheduled
+                        ? html`<span class="badge badge-scheduled">Programado</span>`
+                        : html`<span class="badge badge-published">Publicado</span>`)
                     : html`<span class="badge badge-draft">Borrador</span>`}`
             : ''}
         </span>
@@ -215,6 +224,75 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
         }
       });
 
+      // --- Scheduled Date Handling ---
+      const localInput = document.getElementById('scheduledAtLocalInput');
+      const hiddenInput = document.getElementById('scheduledAtHiddenInput');
+      const publishBtn = document.getElementById('publishBtn');
+      const publishIcon = publishBtn.querySelector('i');
+
+      // 1. Initialize Local Input from UTC Hidden Input
+      if (hiddenInput.value) {
+        // Parse UTC string (YYYY-MM-DDTHH:mm:ss or similar)
+        // We append 'Z' to ensure it is treated as UTC if it's not already ISO
+        let utcString = hiddenInput.value;
+        if (!utcString.endsWith('Z') && !utcString.includes('+')) {
+            utcString += 'Z';
+        }
+
+        try {
+            const date = new Date(utcString);
+            if (!isNaN(date.getTime())) {
+                // Convert to Local ISO string for input (YYYY-MM-DDTHH:mm)
+                // We need to account for timezone offset manually to format it correctly for the input
+                const offset = date.getTimezoneOffset() * 60000;
+                const localISOTime = (new Date(date.getTime() - offset)).toISOString().slice(0, 16);
+                localInput.value = localISOTime;
+                updateButtonState();
+            }
+        } catch (e) {
+            console.error('Error parsing date:', e);
+        }
+      }
+
+      // 2. Listen for changes to update Hidden Input (UTC)
+      localInput.addEventListener('change', () => {
+        if (localInput.value) {
+            const date = new Date(localInput.value);
+            // Convert to UTC string (YYYY-MM-DD HH:MM:SS format for SQLite preferred)
+            const iso = date.toISOString(); // 2023-10-27T10:00:00.000Z
+            // SQLite expects YYYY-MM-DD HH:MM:SS usually, but ISO string works if we are consistent.
+            // Let's strip T and Z to make it look like our existing DB format: YYYY-MM-DD HH:MM:SS
+            const sqliteFormat = iso.replace('T', ' ').slice(0, 19);
+            hiddenInput.value = sqliteFormat;
+        } else {
+            hiddenInput.value = '';
+        }
+        updateButtonState();
+      });
+
+      function updateButtonState() {
+        if (localInput.value) {
+            const date = new Date(localInput.value);
+            const now = new Date();
+            if (date > now) {
+                publishBtn.innerHTML = '<i class="fas fa-clock"></i> Programar Publicación';
+                publishBtn.classList.remove('btn-primary');
+                publishBtn.classList.add('btn-warning');
+                publishBtn.style.backgroundColor = '#f59e0b';
+                publishBtn.style.borderColor = '#d97706';
+                publishBtn.style.color = 'white';
+            } else {
+                publishBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Publicar Cambios';
+                publishBtn.className = 'btn btn-primary btn-lg'; // Reset classes
+                publishBtn.style = ''; // Reset inline styles
+            }
+        } else {
+            publishBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Publicar Cambios';
+            publishBtn.className = 'btn btn-primary btn-lg';
+            publishBtn.style = '';
+        }
+      }
+
       // Form Submit
       document.getElementById('postForm').onsubmit = function() {
         // Populate hidden input with HTML
@@ -253,7 +331,17 @@ app.get('/', async (c) => {
           </tr>
         </thead>
         <tbody>
-          ${posts.results?.map((post: any) => html`
+          ${posts.results?.map((post: any) => {
+            let isScheduled = false
+            if (post.published && post.scheduled_at) {
+                // Ensure UTC interpretation
+                const utcString = post.scheduled_at.replace(' ', 'T') + (post.scheduled_at.includes('Z') ? '' : 'Z')
+                if (new Date(utcString) > new Date()) {
+                    isScheduled = true
+                }
+            }
+
+            return html`
             <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="padding: 15px;">
                 <strong>${post.title}</strong><br>
@@ -261,13 +349,15 @@ app.get('/', async (c) => {
               </td>
               <td style="padding: 15px;">
                 ${post.published
-                  ? html`<span class="badge" style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px;">Publicado</span>`
+                  ? (isScheduled
+                      ? html`<span class="badge" style="background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px;">Programado</span>`
+                      : html`<span class="badge" style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px;">Publicado</span>`)
                   : html`<span class="badge" style="background: #cbd5e1; color: #475569; padding: 4px 8px; border-radius: 4px;">Borrador</span>`
                 }
               </td>
               <td style="padding: 15px;">
                 ${post.scheduled_at
-                  ? new Date(post.scheduled_at).toLocaleString()
+                  ? new Date(post.scheduled_at.replace(' ', 'T') + (post.scheduled_at.includes('Z') ? '' : 'Z')).toLocaleString()
                   : '-'
                 }
               </td>
@@ -281,7 +371,7 @@ app.get('/', async (c) => {
                 </a>
               </td>
             </tr>
-          `)}
+          `})}
         </tbody>
       </table>
     </div>
@@ -483,7 +573,7 @@ app.post('/', async (c) => {
     // 2. Create the initial version
     const versionStatus = action === 'publish' ? 'published' : 'draft'
     await versioning.createVersion('blog_post', postId, {
-        title, content, excerpt, image_url
+        title, content, excerpt, image_url, hashtags, scheduled_at
     }, versionStatus)
 
     return c.redirect('/admin/blog')
@@ -522,7 +612,7 @@ app.post('/:id', async (c) => {
 
         // Create Published Version
         await versioning.createVersion('blog_post', parseInt(id), {
-            title, content, excerpt, image_url
+            title, content, excerpt, image_url, hashtags, scheduled_at
         }, 'published')
 
       } else {
@@ -530,7 +620,7 @@ app.post('/:id', async (c) => {
         // Note: we might want to update updated_at? No, let's leave main table untouched so users know when it was last published.
 
         await versioning.createVersion('blog_post', parseInt(id), {
-            title, content, excerpt, image_url
+            title, content, excerpt, image_url, hashtags, scheduled_at
         }, 'draft')
       }
 
