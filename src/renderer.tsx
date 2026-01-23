@@ -50,6 +50,7 @@ export const renderer = jsxRenderer(({ children }) => {
                 <a href="/blog">Blog</a>
                 <a href="/sobre-nosotros">Sobre Nosotros</a>
                 <a href="/contacto">Contacto</a>
+                <a href="/admin" id="admin-link" style="display: none; color: #8b5cf6; font-weight: bold;">Panel</a>
               </nav>
 
               <div style="display: flex; gap: 10px; align-items: center;">
@@ -167,26 +168,40 @@ export const renderer = jsxRenderer(({ children }) => {
         
         {/* Auth State Script */}
         <script dangerouslySetInnerHTML={{__html: `
-          // Verificar estado de autenticación al cargar
           (async function checkAuth() {
+            function remove(id) {
+              var el = document.getElementById(id);
+              if (el) el.remove();
+            }
+            function show(id, display) {
+              var el = document.getElementById(id);
+              if (el) el.style.display = display || 'inline-flex';
+            }
+
             try {
               const response = await fetch('/api/me');
               const data = await response.json();
               
               if (data.success && data.user) {
-                // Usuario autenticado
-                document.getElementById('login-link')?.remove();
-                document.getElementById('start-link')?.remove();
-                document.getElementById('dashboard-link').style.display = 'inline-flex';
+                remove('login-link');
+                remove('start-link');
+                show('dashboard-link');
+
+                if (data.user.role === 'admin') {
+                  var adminLink = document.getElementById('admin-link');
+                  if (adminLink) adminLink.style.display = '';
+                } else {
+                  remove('admin-link');
+                }
               } else {
-                // Usuario no autenticado
-                document.getElementById('dashboard-link')?.remove();
-                document.getElementById('login-link').style.display = 'inline-flex';
+                remove('dashboard-link');
+                remove('admin-link');
+                show('login-link');
               }
             } catch (error) {
-              // Error o no autenticado
-              document.getElementById('dashboard-link')?.remove();
-              document.getElementById('login-link').style.display = 'inline-flex';
+              remove('dashboard-link');
+              remove('admin-link');
+              show('login-link');
             }
           })();
         `}} />

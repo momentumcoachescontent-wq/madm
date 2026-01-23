@@ -70,8 +70,8 @@ document.addEventListener('DOMContentLoaded', function() {
         button.disabled = false;
         button.innerHTML = originalText;
       }
-    }
-  });
+    });
+  }
   
   // Smooth scroll para enlaces internos
   for (const anchor of document.querySelectorAll('a[href^="#"]')) {
