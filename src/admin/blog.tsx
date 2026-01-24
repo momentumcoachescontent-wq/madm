@@ -1,25 +1,13 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { VersioningService, Version } from '../lib/versioning'
+import { AdminLayout } from './layout'
 
 type Bindings = {
   DB: D1Database
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
-
-// Helper for Admin Layout
-const AdminLayout = (children: unknown, title: string) => html`
-  <div class="admin-container" style="padding: 20px;">
-    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-      <h1>${title}</h1>
-      <a href="/admin/blog-posts" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> Volver al Listado
-      </a>
-    </div>
-    ${children}
-  </div>
-`
 
 // Helper: Versions List
 const VersionsListHelper = (versions: any[]) => { return html`
@@ -41,8 +29,8 @@ const VersionsListHelper = (versions: any[]) => { return html`
                 <td style="padding: 10px;">${new Date(v.created_at).toLocaleString()}</td>
                 <td style="padding: 10px;">
                     ${v.status === 'published'
-                        ? html`<span class="badge badge-published">Publicado</span>`
-                        : html`<span class="badge badge-draft">Borrador</span>`
+                        ? html`<span class="badge" style="background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px;">Publicado</span>`
+                        : html`<span class="badge" style="background: #e2e8f0; color: #475569; padding: 4px 8px; border-radius: 4px;">Borrador</span>`
                     }
                 </td>
                 <td style="padding: 10px; color: #64748b;">${v.change_summary || '-'}</td>
@@ -96,12 +84,6 @@ const ViewVersionHelper = (version: any, diffContent: string) => { return html`
 ` }
 
 const ListPageHelper = (posts: any[]) => { return html`
-    <div style="margin-bottom: 20px;">
-      <a href="/admin/blog-posts/new" class="btn btn-primary">
-        <i class="fas fa-plus"></i> Nuevo Post
-      </a>
-    </div>
-
     <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
       <table style="width: 100%; border-collapse: collapse;">
         <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
@@ -449,12 +431,22 @@ app.get('/', async (c) => {
     "SELECT id, title, slug, published, created_at, scheduled_at, views FROM blog_posts ORDER BY created_at DESC"
   ).all()
 
-  return c.render(AdminLayout(ListPageHelper(posts.results || []), 'Gestión de Blog'))
+  return c.html(AdminLayout({
+    title: 'Gestión de Blog',
+    children: ListPageHelper(posts.results || []),
+    activeItem: 'blog',
+    headerActions: html`<a href="/admin/blog-posts/new" class="btn btn-primary"><i class="fas fa-plus"></i> Nuevo Post</a>`
+  }))
 })
 
 // CREATE FORM
 app.get('/new', (c) => {
-  return c.render(AdminLayout(PostForm(), 'Crear Nuevo Post'))
+  return c.html(AdminLayout({
+    title: 'Crear Nuevo Post',
+    children: PostForm(),
+    activeItem: 'blog',
+    headerActions: html`<a href="/admin/blog-posts" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Listado</a>`
+  }))
 })
 
 // VIEW VERSION / DIFF
@@ -474,7 +466,12 @@ app.get('/versions/:versionId', async (c) => {
   // Calculate Diff
   const diffContent = versioning.compareText((post?.content as string) || '', version.content || '')
 
-  return c.render(AdminLayout(ViewVersionHelper(version, diffContent), "Ver Versión"))
+  return c.html(AdminLayout({
+    title: 'Ver Versión',
+    children: ViewVersionHelper(version, diffContent),
+    activeItem: 'blog',
+    headerActions: html`<a href="/admin/blog-posts/${version['post_id']}/edit" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver a Edición</a>`
+  }))
 })
 
 // RESTORE VERSION
@@ -543,7 +540,12 @@ app.get('/:id/edit', async (c) => {
       }
   }
 
-  return c.render(AdminLayout(EditPageHelper(workingCopy, isDraft, versions), 'Editar Post'))
+  return c.html(AdminLayout({
+    title: 'Editar Post',
+    children: EditPageHelper(workingCopy, isDraft, versions),
+    activeItem: 'blog',
+    headerActions: html`<a href="/admin/blog-posts" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Listado</a>`
+  }))
 })
 
 // CREATE ACTION

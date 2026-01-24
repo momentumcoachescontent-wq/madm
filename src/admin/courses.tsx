@@ -1,28 +1,12 @@
 import { Hono } from 'hono'
 import { html } from 'hono/html'
+import { AdminLayout } from './layout'
 
 type Bindings = {
   DB: D1Database
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
-
-const AdminLayout = (children: unknown, title: string) => html`
-  <div class="admin-container" style="padding: 20px; max-width: 1200px; margin: 0 auto;">
-    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-      <h1 style="color: #1e293b;">${title}</h1>
-      <div style="display: flex; gap: 10px;">
-        <a href="/admin/courses/new" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Nuevo Curso
-        </a>
-        <a href="/admin" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Volver al Panel
-        </a>
-      </div>
-    </div>
-    ${children}
-  </div>
-`
 
 // Form Helper
 const CourseForm = (course: any = {}) => {
@@ -150,12 +134,22 @@ const CourseListHelper = (courses: any[]) => html`
 app.get('/', async (c) => {
   const courses = await c.env.DB.prepare('SELECT * FROM courses ORDER BY created_at DESC').all()
 
-  return c.render(AdminLayout(CourseListHelper(courses.results || []), 'Gestión de Cursos'))
+  return c.html(AdminLayout({
+    title: 'Gestión de Cursos',
+    children: CourseListHelper(courses.results || []),
+    activeItem: 'courses',
+    headerActions: html`<a href="/admin/courses/new" class="btn btn-primary"><i class="fas fa-plus"></i> Nuevo Curso</a>`
+  }))
 })
 
 // New
 app.get('/new', (c) => {
-  return c.render(AdminLayout(CourseForm(), 'Crear Nuevo Curso'))
+  return c.html(AdminLayout({
+    title: 'Crear Nuevo Curso',
+    children: CourseForm(),
+    activeItem: 'courses',
+    headerActions: html`<a href="/admin/courses" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Listado</a>`
+  }))
 })
 
 // Edit
@@ -163,7 +157,13 @@ app.get('/:id', async (c) => {
   const id = c.req.param('id')
   const course = await c.env.DB.prepare('SELECT * FROM courses WHERE id = ?').bind(id).first()
   if (!course) return c.notFound()
-  return c.render(AdminLayout(CourseForm(course), 'Editar Curso'))
+
+  return c.html(AdminLayout({
+    title: 'Editar Curso',
+    children: CourseForm(course),
+    activeItem: 'courses',
+    headerActions: html`<a href="/admin/courses" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Listado</a>`
+  }))
 })
 
 // Create Action

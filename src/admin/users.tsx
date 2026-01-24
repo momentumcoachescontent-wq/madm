@@ -1,23 +1,12 @@
 import { Hono } from 'hono'
 import { html } from 'hono/html'
+import { AdminLayout } from './layout'
 
 type Bindings = {
   DB: D1Database
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
-
-const AdminLayout = (children: unknown, title: string) => html`
-  <div class="admin-container" style="padding: 20px; max-width: 1200px; margin: 0 auto;">
-    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-      <h1 style="color: #1e293b;">${title}</h1>
-      <a href="/admin" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> Volver al Panel
-      </a>
-    </div>
-    ${children}
-  </div>
-`
 
 // Helper: Users List
 const UsersListHelper = (users: any[]) => html`
@@ -65,7 +54,12 @@ const UsersListHelper = (users: any[]) => html`
 app.get('/', async (c) => {
   const users = await c.env.DB.prepare('SELECT * FROM users ORDER BY created_at DESC').all()
 
-  return c.render(AdminLayout(UsersListHelper(users.results || []), 'Gestión de Usuarios'))
+  return c.html(AdminLayout({
+    title: 'Gestión de Usuarios',
+    children: UsersListHelper(users.results || []),
+    activeItem: 'users',
+    headerActions: html`<a href="/admin" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Panel</a>`
+  }))
 })
 
 export default app
