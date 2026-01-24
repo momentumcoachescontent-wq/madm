@@ -26,6 +26,7 @@ app.use(renderer)
 // Mount Admin App
 // El admin usa c.render que usa el renderer global para el layout.
 // AdminApp usa adminMiddleware para protección.
+app.get('/admin', (c) => c.redirect('/admin/'))
 app.route('/admin', adminApp)
 
 // Media Proxy for R2
