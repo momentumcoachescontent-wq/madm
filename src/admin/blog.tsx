@@ -398,12 +398,12 @@ app.get('/versions/:versionId', async (c) => {
     const diffContent = versioning.compareText(post?.content as string || '', version.content || '')
 
 return c.render(
- <AdminLayout title="Ver Versión">
-  {html`
-    <style>
-      .diff-container { background: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
-      .version-meta { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-    </style>                            
+  AdminLayout(
+    html`
+      <style>
+        .diff-container { background: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .version-meta { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+      </style>                        
       <div class="diff-container">
         <div class="version-meta">
           <h2>Versión del ${new Date(version.created_at).toLocaleString()}</h2>
@@ -426,6 +426,8 @@ return c.render(
           ${raw(diffContent)}
         </div>
       </div>
+    `,
+    "Ver Versión"
     `}
   </AdminLayout>
 );
