@@ -1,5 +1,4 @@
 import { jsxRenderer } from 'hono/jsx-renderer';
-import React from "react"
 
 export const renderer = jsxRenderer(({ children }) => {
   return (
@@ -9,9 +8,6 @@ export const renderer = jsxRenderer(({ children }) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Más Allá del Miedo - Transforma el miedo en claridad y poder personal</title>
         <meta name="description" content="Herramientas psicológicas para jóvenes: aprende a detectar manipulación, construir límites sanos y liderar tu propia vida con claridad y poder personal." />
-        
-        {/* Tailwind CSS */}
-        <script src="https://cdn.tailwindcss.com"></script>
         
         {/* Font Awesome Icons */}
         <link 
