@@ -400,8 +400,6 @@ app.get('/versions/:versionId', async (c) => {
 return c.render(
   AdminLayout(
     html`                    
-      <div class="diff-container">
-        <div class="version-meta">
           <h2>Versión del ${new Date(version.created_at).toLocaleString()}</h2>
           <span class="badge" style="background: ${version.status === 'published' ? '#dcfce7' : '#e2e8f0'}">
             ${version.status.toUpperCase()}
@@ -414,8 +412,6 @@ return c.render(
               </button>
             </form>
             <a href="/admin/blog-posts/${version.post_id}/edit" class="btn btn-secondary">Cancelar</a>
-          </div>
-        </div>
 
         <h3>Comparación con versión actual (Live)</h3>
         <div style="margin-top: 10px; border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #f9f9f9;">
