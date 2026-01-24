@@ -14,15 +14,8 @@ const app = new Hono()
 // Protect all admin routes
 app.use('*', adminMiddleware)
 
-// Main Dashboard
-app.get('/', async (c) => {
-  // Fetch stats
-  const postsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM blog_posts').first()
-  const usersCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first()
-  const coursesCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM courses').first()
-  const lessonsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM lessons').first()
-
-  return c.render(html`
+// Helper: Dashboard View
+const DashboardHelper = (postsCount: any, usersCount: any, coursesCount: any, lessonsCount: any) => html`
     <div class="admin-container" style="padding: 40px; max-width: 1200px; margin: 0 auto;">
       <div style="margin-bottom: 40px;">
         <h1 style="font-size: 2.5rem; color: #1e293b; margin-bottom: 10px;">Panel de Administración</h1>
@@ -117,7 +110,17 @@ app.get('/', async (c) => {
         window.location.href = '/login';
       }
     </script>
-  `)
+`
+
+// Main Dashboard
+app.get('/', async (c) => {
+  // Fetch stats
+  const postsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM blog_posts').first()
+  const usersCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first()
+  const coursesCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM courses').first()
+  const lessonsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM lessons').first()
+
+  return c.render(DashboardHelper(postsCount, usersCount, coursesCount, lessonsCount))
 })
 
 // Mount sub-apps

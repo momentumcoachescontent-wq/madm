@@ -100,16 +100,8 @@ const LessonForm = (lesson: any = {}, courses: any[] = []) => {
   `
 }
 
-// List
-app.get('/', async (c) => {
-  const lessons = await c.env.DB.prepare(`
-    SELECT l.*, c.title as course_title
-    FROM lessons l
-    JOIN courses c ON l.course_id = c.id
-    ORDER BY c.title ASC, l.module_number ASC, l.lesson_number ASC
-  `).all()
-
-  return c.render(AdminLayout(html`
+// Helper: Lesson List
+const LessonListHelper = (lessons: any[]) => html`
     <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
       <table style="width: 100%; border-collapse: collapse;">
         <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
@@ -123,7 +115,7 @@ app.get('/', async (c) => {
           </tr>
         </thead>
         <tbody>
-          ${lessons.results?.map((lesson: any) => html`
+          ${lessons.map((lesson: any) => html`
             <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="padding: 15px; font-weight: 600;">${lesson.course_title}</td>
               <td style="padding: 15px;">${lesson.module_number}</td>
@@ -148,7 +140,18 @@ app.get('/', async (c) => {
         </tbody>
       </table>
     </div>
-  `, 'Gestión de Lecciones'))
+`
+
+// List
+app.get('/', async (c) => {
+  const lessons = await c.env.DB.prepare(`
+    SELECT l.*, c.title as course_title
+    FROM lessons l
+    JOIN courses c ON l.course_id = c.id
+    ORDER BY c.title ASC, l.module_number ASC, l.lesson_number ASC
+  `).all()
+
+  return c.render(AdminLayout(LessonListHelper(lessons.results || []), 'Gestión de Lecciones'))
 })
 
 // New

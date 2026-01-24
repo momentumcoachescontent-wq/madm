@@ -20,8 +20,8 @@ const AdminLayout = (children: unknown, title: string) => html`
   </div>
 `
 
-// View: Media Library
-const MediaLibrary = (objects: R2Object[], cursor?: string) => html`
+// View: Media Library Helper
+const MediaLibraryHelper = (objects: R2Object[], cursor?: string) => html`
   <style>
     .media-grid {
       display: grid;
@@ -290,7 +290,7 @@ const MediaLibrary = (objects: R2Object[], cursor?: string) => html`
 app.get('/', async (c) => {
   try {
     const list = await c.env.IMAGES_BUCKET.list({ limit: 100 })
-    return c.render(AdminLayout(MediaLibrary(list.objects), 'Biblioteca Multimedia'))
+    return c.render(AdminLayout(MediaLibraryHelper(list.objects), 'Biblioteca Multimedia'))
   } catch (error) {
     return c.text('Error listing files: ' + (error as Error).message, 500)
   }
