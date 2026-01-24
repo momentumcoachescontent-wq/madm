@@ -397,37 +397,39 @@ app.get('/versions/:versionId', async (c) => {
     // Calculate Diff
     const diffContent = versioning.compareText(post?.content as string || '', version.content || '')
 
-    return c.render(AdminLayout(html`
-        <style>
-            .diff-container { background: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
-            .version-meta { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-        </style>
+return c.render(
+  <AdminLayout title="Ver Versión">
+    {html`
+      <style>
+        .diff-container { background: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .version-meta { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+      </style>
 
-        <div class="diff-container">
-            <div class="version-meta">
-                <h2>Versión del ${new Date(version.created_at).toLocaleString()}</h2>
-                <span class="badge" style="background: ${version.status === 'published' ? '#dcfce7' : '#e2e8f0'}">
-                    ${version.status.toUpperCase()}
-                </span>
-                <p><strong>Resumen de cambios:</strong> ${version.change_summary || 'N/A'}</p>
-
-                <div style="margin-top: 15px;">
-                    <form method="POST" action="/admin/blog-posts/versions/${version.id}/restore" style="display: inline;">
-                        <button type="submit" class="btn btn-primary" onclick="return confirm('¿Restaurar esta versión? Se creará un nuevo borrador.')">
-                            <i class="fas fa-undo"></i> Restaurar como Borrador
-                        </button>
-                    </form>
-                    <a href="/admin/blog-posts/${version['post_id']}/edit" class="btn btn-secondary">Cancelar</a>
-                </div>
-            </div>
-
-            <h3>Comparación con versión actual (Live)</h3>
-            <div style="margin-top: 10px; border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #f9f9f9;">
-                ${raw(diffContent)}
-            </div>
+      <div class="diff-container">
+        <div class="version-meta">
+          <h2>Versión del ${new Date(version.created_at).toLocaleString()}</h2>
+          <span class="badge" style="background: ${version.status === 'published' ? '#dcfce7' : '#e2e8f0'}">
+            ${version.status.toUpperCase()}
+          </span>
+          <p><strong>Resumen de cambios:</strong> ${version.change_summary || 'N/A'}</p>
+          <div style="margin-top: 15px;">
+            <form method="POST" action="/admin/blog-posts/versions/${version.id}/restore" style="display: inline;">
+              <button type="submit" class="btn btn-primary" onclick="return confirm('¿Restaurar esta versión? Se creará un nuevo borrador.')">
+                <i class="fas fa-undo"></i> Restaurar como Borrador
+              </button>
+            </form>
+            <a href="/admin/blog-posts/${version.post_id}/edit" class="btn btn-secondary">Cancelar</a>
+          </div>
         </div>
-    `, 'Ver Versión'))
-})
+
+        <h3>Comparación con versión actual (Live)</h3>
+        <div style="margin-top: 10px; border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #f9f9f9;">
+          ${raw(diffContent)}
+        </div>
+      </div>
+    `}
+  </AdminLayout>
+);
 
 // RESTORE VERSION
 app.post('/versions/:versionId/restore', async (c) => {
