@@ -42,7 +42,7 @@ export async function getUserFromSession(db: D1Database, sessionToken: string) {
     WHERE s.session_token = ? 
     AND s.expires_at > datetime('now')
     AND u.active = 1
-  `).bind(sessionToken).first();
+  `).bind(sessionToken).first<any>();
   
   if (!session) return null;
   
@@ -86,26 +86,29 @@ export function formatDuration(seconds: number): string {
 export async function getCourseProgress(db: D1Database, userId: number, courseId: number) {
   const totalLessons = await db.prepare(`
     SELECT COUNT(*) as total FROM lessons WHERE course_id = ? AND published = 1
-  `).bind(courseId).first();
+  `).bind(courseId).first<any>();
   
   const completedLessons = await db.prepare(`
     SELECT COUNT(*) as completed FROM student_progress 
     WHERE user_id = ? AND course_id = ? AND completed = 1
-  `).bind(userId, courseId).first();
+  `).bind(userId, courseId).first<any>();
   
-  const total = (totalLessons as any)?.total || 0;
-  const completed = (completedLessons as any)?.completed || 0;
+  const total = totalLessons?.total || 0;
+  const completed = completedLessons?.completed || 0;
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
   
   return { total, completed, percentage };
 }
 
+import { Context } from 'hono';
+import { CloudflareBindings } from './index';
+
 // Helper para obtener usuario actual desde cookies en una ruta
-export async function getCurrentUser(c: any) {
+export async function getCurrentUser(c: Context<{ Bindings: CloudflareBindings }>) {
   const cookies = c.req.header('Cookie');
   if (!cookies) return null;
   
-  const sessionToken = cookies.split(';').find(c => c.trim().startsWith('session='))?.split('=')[1];
+  const sessionToken = cookies.split(';').find((cookie: string) => cookie.trim().startsWith('session='))?.split('=')[1];
   if (!sessionToken) return null;
   
   return getUserFromSession(c.env.DB, sessionToken);
