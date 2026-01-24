@@ -9,6 +9,10 @@ export default defineConfig(({ mode }) => {
       devServer({
         entry: 'src/index.tsx'
       })
-    ]
+    ],
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true
+    }
   }
 })
