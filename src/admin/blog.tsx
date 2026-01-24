@@ -400,11 +400,11 @@ app.get('/versions/:versionId', async (c) => {
 return c.render(
   <AdminLayout title="Ver Versión">
     {html`
-      <style>
-        .diff-container { background: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
-        .version-meta { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-      </style>
-
+     <style>{`
+  .diff-container { background: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
+  .version-meta { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+`}
+    </style>                               
       <div class="diff-container">
         <div class="version-meta">
           <h2>Versión del ${new Date(version.created_at).toLocaleString()}</h2>
