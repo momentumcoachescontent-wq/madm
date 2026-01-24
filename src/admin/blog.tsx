@@ -13,7 +13,7 @@ const AdminLayout = (children: unknown, title: string) => html`
   <div class="admin-container" style="padding: 20px;">
     <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
       <h1>${title}</h1>
-      <a href="/admin/blog" class="btn btn-secondary">
+      <a href="/admin/blog-posts" class="btn btn-secondary">
         <i class="fas fa-arrow-left"></i> Volver al Listado
       </a>
     </div>
@@ -24,7 +24,7 @@ const AdminLayout = (children: unknown, title: string) => html`
 // Helper: Form View
 const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any = null) => {
   const isEdit = !!(Boolean(post.id))
-  const action = isEdit ? "/admin/blog/"+post.id : '/admin/blog'
+  const action = isEdit ? "/admin/blog-posts/"+post.id : '/admin/blog-posts'
 
   // Format date for datetime-local input (YYYY-MM-DDThh:mm)
   // We keep this variable to pass the UTC string to the hidden input and JS
@@ -59,7 +59,7 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
         Estás editando un borrador no publicado (guardado el ${new Date(post.created_at || post.updated_at).toLocaleString()}).
         <br>
         <div style="margin-top: 10px;">
-            <a href="/admin/blog/${post.id}/discard-draft" class="btn btn-sm btn-outline" style="color: #856404; border-color: #856404;" onclick="return confirm('¿Estás seguro? Se perderán los cambios del borrador actual.')">
+            <a href="/admin/blog-posts/${post.id}/discard-draft" class="btn btn-sm btn-outline" style="color: #856404; border-color: #856404;" onclick="return confirm('¿Estás seguro? Se perderán los cambios del borrador actual.')">
                 Descartar cambios y volver a versión publicada
             </a>
         </div>
@@ -314,7 +314,7 @@ app.get('/', async (c) => {
 
   return c.render(AdminLayout(html`
     <div style="margin-bottom: 20px;">
-      <a href="/admin/blog/new" class="btn btn-primary">
+      <a href="/admin/blog-posts/new" class="btn btn-primary">
         <i class="fas fa-plus"></i> Nuevo Post
       </a>
     </div>
@@ -363,7 +363,7 @@ app.get('/', async (c) => {
               </td>
               <td style="padding: 15px;">${post.views || 0}</td>
               <td style="padding: 15px; text-align: right;">
-                <a href="/admin/blog/${post.id}/edit" class="btn btn-sm btn-secondary">
+                <a href="/admin/blog-posts/${post.id}/edit" class="btn btn-sm btn-secondary">
                   <i class="fas fa-edit"></i>
                 </a>
                 <a href="/blog/${post.slug}" target="_blank" class="btn btn-sm btn-outline">
@@ -371,7 +371,7 @@ app.get('/', async (c) => {
                 </a>
               </td>
             </tr>
-          `})}
+          `)}
         </tbody>
       </table>
     </div>
@@ -412,12 +412,12 @@ app.get('/versions/:versionId', async (c) => {
                 <p><strong>Resumen de cambios:</strong> ${version.change_summary || 'N/A'}</p>
 
                 <div style="margin-top: 15px;">
-                    <form method="POST" action="/admin/blog/versions/${version.id}/restore" style="display: inline;">
+                    <form method="POST" action="/admin/blog-posts/versions/${version.id}/restore" style="display: inline;">
                         <button type="submit" class="btn btn-primary" onclick="return confirm('¿Restaurar esta versión? Se creará un nuevo borrador.')">
                             <i class="fas fa-undo"></i> Restaurar como Borrador
                         </button>
                     </form>
-                    <a href="/admin/blog/${version['post_id']}/edit" class="btn btn-secondary">Cancelar</a>
+                    <a href="/admin/blog-posts/${version['post_id']}/edit" class="btn btn-secondary">Cancelar</a>
                 </div>
             </div>
 
@@ -439,7 +439,7 @@ app.post('/versions/:versionId/restore', async (c) => {
         if (!version) return c.notFound()
 
         await versioning.restoreVersion('blog_post', version['post_id'], parseInt(versionId))
-        return c.redirect(`/admin/blog/${version['post_id']}/edit`)
+        return c.redirect(`/admin/blog-posts/${version['post_id']}/edit`)
     } catch (e) {
         return c.text('Error restoring version: ' + (e as Error).message, 500)
     }
@@ -452,7 +452,7 @@ app.get('/:id/discard-draft', async (c) => {
     // Delete ALL versions with status='draft' for this post
     await c.env.DB.prepare('DELETE FROM blog_post_versions WHERE post_id = ? AND status = ?').bind(id, 'draft').run()
 
-    return c.redirect(`/admin/blog/${id}/edit`)
+    return c.redirect(`/admin/blog-posts/${id}/edit`)
 })
 
 // DELETE VERSION
@@ -465,7 +465,7 @@ app.post('/versions/:versionId/delete', async (c) => {
         if (!version) return c.notFound()
 
         await versioning.deleteVersion('blog_post', parseInt(versionId))
-        return c.redirect(`/admin/blog/${version['post_id']}/edit`)
+        return c.redirect(`/admin/blog-posts/${version['post_id']}/edit`)
     } catch (e) {
         return c.text('Error deleting version: ' + (e as Error).message, 500)
     }
@@ -520,10 +520,10 @@ app.get('/:id/edit', async (c) => {
                 </td>
                 <td style="padding: 10px; color: #64748b;">${v.change_summary || '-'}</td>
                 <td style="padding: 10px; text-align: right;">
-                    <a href="/admin/blog/versions/${v.id}" class="btn btn-sm btn-outline" title="Ver / Restaurar">
+                    <a href="/admin/blog-posts/versions/${v.id}" class="btn btn-sm btn-outline" title="Ver / Restaurar">
                         <i class="fas fa-eye"></i>
                     </a>
-                    <form method="POST" action="/admin/blog/versions/${v.id}/delete" style="display:inline;" onsubmit="return confirm('¿Eliminar esta versión permanentemente?')">
+                    <form method="POST" action="/admin/blog-posts/versions/${v.id}/delete" style="display:inline;" onsubmit="return confirm('¿Eliminar esta versión permanentemente?')">
                         <button type="submit" class="btn btn-sm btn-outline" style="color: #ef4444; border-color: #ef4444; margin-left: 5px;" title="Eliminar">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -576,7 +576,7 @@ app.post('/', async (c) => {
         title, content, excerpt, image_url, hashtags, scheduled_at
     }, versionStatus)
 
-    return c.redirect('/admin/blog')
+    return c.redirect('/admin/blog-posts')
   } catch (error) {
     return c.text('Error creating post: ' + (error as Error).message, 500)
   }
@@ -624,7 +624,7 @@ app.post('/:id', async (c) => {
         }, 'draft')
       }
 
-    return c.redirect('/admin/blog/' + id + '/edit')
+    return c.redirect('/admin/blog-posts/' + id + '/edit')
   } catch (error) {
     return c.text('Error updating post: ' + (error as Error).message, 500)
   }
