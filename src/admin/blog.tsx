@@ -375,7 +375,7 @@ app.get('/', async (c) => {
         </tbody>
       </table>
     </div>
-  `, 'Gestión de Blog'))
+  , 'Gestión de Blog'))
 })
 
 // CREATE FORM
