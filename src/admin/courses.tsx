@@ -102,11 +102,8 @@ const CourseForm = (course: any = {}) => {
   `
 }
 
-// List
-app.get('/', async (c) => {
-  const courses = await c.env.DB.prepare('SELECT * FROM courses ORDER BY created_at DESC').all()
-
-  return c.render(AdminLayout(html`
+// Helper: Course List
+const CourseListHelper = (courses: any[]) => html`
     <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
       <table style="width: 100%; border-collapse: collapse;">
         <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
@@ -119,7 +116,7 @@ app.get('/', async (c) => {
           </tr>
         </thead>
         <tbody>
-          ${courses.results?.map((course: any) => html`
+          ${courses.map((course: any) => html`
             <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="padding: 15px;">
                 <div style="font-weight: 700;">${course.title}</div>
@@ -147,7 +144,13 @@ app.get('/', async (c) => {
         </tbody>
       </table>
     </div>
-  `, 'Gestión de Cursos'))
+`
+
+// List
+app.get('/', async (c) => {
+  const courses = await c.env.DB.prepare('SELECT * FROM courses ORDER BY created_at DESC').all()
+
+  return c.render(AdminLayout(CourseListHelper(courses.results || []), 'Gestión de Cursos'))
 })
 
 // New

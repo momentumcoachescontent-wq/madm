@@ -19,10 +19,8 @@ const AdminLayout = (children: unknown, title: string) => html`
   </div>
 `
 
-app.get('/', async (c) => {
-  const users = await c.env.DB.prepare('SELECT * FROM users ORDER BY created_at DESC').all()
-
-  return c.render(AdminLayout(html`
+// Helper: Users List
+const UsersListHelper = (users: any[]) => html`
     <div style="background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
       <table style="width: 100%; border-collapse: collapse;">
         <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
@@ -35,7 +33,7 @@ app.get('/', async (c) => {
           </tr>
         </thead>
         <tbody>
-          ${users.results?.map((user: any) => html`
+          ${users.map((user: any) => html`
             <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="padding: 15px;">
                 <strong>${user.name}</strong>
@@ -62,7 +60,12 @@ app.get('/', async (c) => {
         </tbody>
       </table>
     </div>
-  `, 'Gestión de Usuarios'))
+`
+
+app.get('/', async (c) => {
+  const users = await c.env.DB.prepare('SELECT * FROM users ORDER BY created_at DESC').all()
+
+  return c.render(AdminLayout(UsersListHelper(users.results || []), 'Gestión de Usuarios'))
 })
 
 export default app
