@@ -20,9 +20,12 @@ const app = new Hono<{ Bindings: Bindings }>()
 // Habilitar CORS para APIs
 app.use('/api/*', cors())
 
-// Mount Admin App (antes del renderer global para tener control propio si necesario,
-// pero el admin usa el layout propio, aunque usa c.render que usa el renderer.
-// El renderer global se aplica a todo. AdminApp usa adminMiddleware.)
+// Aplicar el renderer a todas las páginas
+app.use(renderer)
+
+// Mount Admin App
+// El admin usa c.render que usa el renderer global para el layout.
+// AdminApp usa adminMiddleware para protección.
 app.route('/admin', adminApp)
 
 // Media Proxy for R2
@@ -42,9 +45,6 @@ app.get('/media/:key', async (c) => {
     headers,
   })
 })
-
-// Aplicar el renderer a todas las páginas
-app.use(renderer)
 
 // ===== PÁGINAS =====
 
