@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { html } from 'hono/html'
 import { adminMiddleware } from '../middleware/admin'
+import { CloudflareBindings } from '../index'
 import blogApp from './blog'
 import uploadApp from './upload'
 import mediaApp from './media'
@@ -9,7 +10,7 @@ import coursesApp from './courses'
 import lessonsApp from './lessons'
 
 // Define Bindings if needed for types, though usually generic is enough for composition
-const app = new Hono()
+const app = new Hono<{ Bindings: CloudflareBindings }>()
 
 // Protect all admin routes
 app.use('*', adminMiddleware)

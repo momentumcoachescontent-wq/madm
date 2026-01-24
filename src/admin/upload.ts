@@ -11,7 +11,7 @@ app.post('/', async (c) => {
     const body = await c.req.parseBody()
     const file = body['file'] || body['image'] // Support both for backward compatibility during transition, but prefer 'file'
 
-    if (!(Boolean(file)) || !(file instanceof File)) {
+    if (!file || !(file instanceof File)) {
       return c.json({ error: 'No file uploaded' }, 400)
     }
 

@@ -162,14 +162,14 @@ const ListPageHelper = (posts: any[]) => { return html`
 
 // Helper: Form View
 const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any = null) => {
-  const isEdit = !!(Boolean(post.id))
+  const isEdit = !!post.id
   const action = isEdit ? "/admin/blog-posts/"+post.id : '/admin/blog-posts'
 
   // Format date for datetime-local input (YYYY-MM-DDThh:mm)
   // We keep this variable to pass the UTC string to the hidden input and JS
   let scheduledAtUtc = ''
   let isScheduled = false
-  if (Boolean(post.scheduled_at)) {
+  if (post.scheduled_at) {
     // This is already UTC from DB
     scheduledAtUtc = post.scheduled_at.replace(' ', 'T').slice(0, 19)
     if (new Date(scheduledAtUtc) > new Date()) {

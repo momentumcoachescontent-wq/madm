@@ -3,7 +3,7 @@ import { cors } from 'hono/cors'
 import { renderer } from './renderer'
 import adminApp from './admin'
 
-type Bindings = {
+export type CloudflareBindings = {
   DB: D1Database
   IMAGES_BUCKET: R2Bucket
   STRIPE_SECRET_KEY: string
@@ -15,7 +15,7 @@ type Bindings = {
   PAYPAL_WEBHOOK_ID: string
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: CloudflareBindings }>()
 
 // Habilitar CORS para APIs
 app.use('/api/*', cors())
@@ -843,7 +843,7 @@ app.get('/contacto', (c) => {
 
                 <div className="form-group">
                   <label for="message">Mensaje *</label>
-                  <textarea id="message" name="message" rows="6" required></textarea>
+                  <textarea id="message" name="message" rows={6} required></textarea>
                 </div>
 
                 <button type="submit" className="btn btn-primary btn-block">
@@ -1307,12 +1307,12 @@ app.get('/registro', (c) => {
 
                 <div className="form-group">
                   <label for="password">Contraseña * (mínimo 6 caracteres)</label>
-                  <input type="password" id="password" name="password" required placeholder="••••••••" minlength="6" />
+                  <input type="password" id="password" name="password" required placeholder="••••••••" minLength={6} />
                 </div>
 
                 <div className="form-group">
                   <label for="password_confirm">Confirmar contraseña *</label>
-                  <input type="password" id="password_confirm" name="password_confirm" required placeholder="••••••••" minlength="6" />
+                  <input type="password" id="password_confirm" name="password_confirm" required placeholder="••••••••" minLength={6} />
                 </div>
 
                 <div className="form-group">
@@ -1476,7 +1476,7 @@ app.post('/api/register', async (c) => {
     // Verificar si el email ya existe
     const existingUser = await c.env.DB.prepare(`
       SELECT id FROM users WHERE email = ?
-    `).bind(email).first()
+    `).bind(email).first<any>()
 
     if (existingUser) {
       return c.json({ error: 'Este email ya está registrado' }, 400)
@@ -1532,7 +1532,7 @@ app.post('/api/login', async (c) => {
       SELECT id, email, name, password_hash, role, active 
       FROM users 
       WHERE email = ?
-    `).bind(email).first()
+    `).bind(email).first<any>()
 
     if (!user || !user.active) {
       return c.json({ error: 'Credenciales inválidas' }, 401)
@@ -1644,7 +1644,7 @@ app.post('/api/create-payment-intent', async (c) => {
     // Obtener información del curso
     const course = await c.env.DB.prepare(`
       SELECT id, title, price, currency FROM courses WHERE id = ? AND published = 1
-    `).bind(courseId).first()
+    `).bind(courseId).first<any>()
 
     if (!course) {
       return c.json({ error: 'Curso no encontrado' }, 404)
@@ -1654,7 +1654,7 @@ app.post('/api/create-payment-intent', async (c) => {
     const enrollment = await c.env.DB.prepare(`
       SELECT id FROM paid_enrollments 
       WHERE user_id = ? AND course_id = ? AND payment_status = 'completed'
-    `).bind(user.id, courseId).first()
+    `).bind(user.id, courseId).first<any>()
 
     if (enrollment) {
       return c.json({ error: 'Ya estás inscrito en este curso' }, 400)
@@ -1662,7 +1662,7 @@ app.post('/api/create-payment-intent', async (c) => {
 
     // Crear Payment Intent con Stripe
     const Stripe = (await import('stripe')).default
-    const stripe = new Stripe(c.env.STRIPE_SECRET_KEY, { apiVersion: '2024-11-20.acacia' })
+    const stripe = new Stripe(c.env.STRIPE_SECRET_KEY, { apiVersion: '2025-01-27.acacia' as any })
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(course.price * 100), // Convertir a centavos
@@ -1699,7 +1699,7 @@ app.post('/api/verify-payment', async (c) => {
 
     // Verificar el pago con Stripe
     const Stripe = (await import('stripe')).default
-    const stripe = new Stripe(c.env.STRIPE_SECRET_KEY, { apiVersion: '2024-11-20.acacia' })
+    const stripe = new Stripe(c.env.STRIPE_SECRET_KEY, { apiVersion: '2025-01-27.acacia' as any })
 
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
 
@@ -1710,7 +1710,7 @@ app.post('/api/verify-payment', async (c) => {
     // Obtener información del curso
     const course = await c.env.DB.prepare(`
       SELECT id, title, price, currency FROM courses WHERE id = ? AND published = 1
-    `).bind(courseId).first()
+    `).bind(courseId).first<any>()
 
     if (!course) {
       return c.json({ error: 'Curso no encontrado' }, 404)
@@ -1769,7 +1769,7 @@ app.post('/api/create-paypal-order', async (c) => {
     // Obtener información del curso
     const course = await c.env.DB.prepare(`
       SELECT id, title, price, currency FROM courses WHERE id = ? AND published = 1
-    `).bind(courseId).first()
+    `).bind(courseId).first<any>()
 
     if (!course) {
       return c.json({ error: 'Curso no encontrado' }, 404)
@@ -1800,7 +1800,7 @@ app.post('/api/create-paypal-order', async (c) => {
       })
     })
 
-    const order = await response.json()
+    const order = await response.json() as any
 
     if (!response.ok) {
       console.error('PayPal error:', order)
@@ -1842,7 +1842,7 @@ app.post('/api/capture-paypal-order', async (c) => {
       }
     })
 
-    const capture = await response.json()
+    const capture = await response.json() as any
 
     if (!response.ok || capture.status !== 'COMPLETED') {
       console.error('PayPal capture error:', capture)
@@ -1852,7 +1852,7 @@ app.post('/api/capture-paypal-order', async (c) => {
     // Obtener información del curso
     const course = await c.env.DB.prepare(`
       SELECT id, title, price, currency FROM courses WHERE id = ? AND published = 1
-    `).bind(courseId).first()
+    `).bind(courseId).first<any>()
 
     if (!course) {
       return c.json({ error: 'Curso no encontrado' }, 404)
@@ -1904,7 +1904,7 @@ app.post('/api/capture-paypal-order', async (c) => {
 app.post('/api/webhooks/stripe', async (c) => {
   try {
     const Stripe = (await import('stripe')).default
-    const stripe = new Stripe(c.env.STRIPE_SECRET_KEY, { apiVersion: '2024-11-20.acacia' })
+    const stripe = new Stripe(c.env.STRIPE_SECRET_KEY, { apiVersion: '2025-01-27.acacia' as any })
     
     const sig = c.req.header('stripe-signature')
     if (!sig) {
@@ -2167,7 +2167,7 @@ app.post('/api/webhooks/paypal', async (c) => {
             SELECT * FROM paid_enrollments 
             WHERE user_id = ? AND course_id = ? AND payment_method = 'paypal'
             ORDER BY created_at DESC LIMIT 1
-          `).bind(courseData.userId, courseData.courseId).first()
+          `).bind(courseData.userId, courseData.courseId).first<any>()
         }
 
         if (enrollment) {
@@ -2204,7 +2204,7 @@ app.post('/api/webhooks/paypal', async (c) => {
           JOIN payment_transactions pt ON pe.id = pt.enrollment_id
           WHERE pt.metadata LIKE ? AND pe.payment_method = 'paypal'
           LIMIT 1
-        `).bind('%' + captureId + '%').first()
+        `).bind('%' + captureId + '%').first<any>()
 
         if (enrollment) {
           try {
@@ -2281,7 +2281,7 @@ app.get('/mi-aprendizaje', async (c) => {
       JOIN courses c ON pe.course_id = c.id
       WHERE pe.user_id = ? AND pe.payment_status = 'completed' AND pe.access_revoked = 0
       ORDER BY pe.enrolled_at DESC
-    `).bind(user.id).all()
+    `).bind(user.id).all<any>()
 
     // Calcular progreso de cada curso
     const coursesWithProgress = await Promise.all(
@@ -2295,7 +2295,7 @@ app.get('/mi-aprendizaje', async (c) => {
           WHERE course_id = ? AND published = 1 
           ORDER BY order_index ASC 
           LIMIT 1
-        `).bind(enrollment.course_id).first()
+        `).bind(enrollment.course_id).first<any>()
 
         // Obtener última lección en progreso (si existe)
         const lastLesson = await c.env.DB.prepare(`
@@ -2305,13 +2305,13 @@ app.get('/mi-aprendizaje', async (c) => {
           WHERE sp.user_id = ? AND sp.course_id = ? AND l.published = 1
           ORDER BY sp.updated_at DESC
           LIMIT 1
-        `).bind(user.id, enrollment.course_id).first()
+        `).bind(user.id, enrollment.course_id).first<any>()
 
         // Obtener certificado si existe
         const certificate = await c.env.DB.prepare(`
           SELECT id FROM certificates 
           WHERE user_id = ? AND course_id = ?
-        `).bind(user.id, enrollment.course_id).first()
+        `).bind(user.id, enrollment.course_id).first<any>()
         
         return {
           ...enrollment,
@@ -2531,7 +2531,7 @@ app.get('/cursos/:courseSlug/leccion/:lessonId', async (c) => {
     // Obtener información del curso
     const course = await c.env.DB.prepare(`
       SELECT id, title, slug FROM courses WHERE slug = ? AND published = 1
-    `).bind(courseSlug).first()
+    `).bind(courseSlug).first<any>()
 
     if (!course) {
       return c.render(
@@ -2567,7 +2567,7 @@ app.get('/cursos/:courseSlug/leccion/:lessonId', async (c) => {
     // Obtener lección
     const lesson = await c.env.DB.prepare(`
       SELECT * FROM lessons WHERE id = ? AND course_id = ? AND published = 1
-    `).bind(lessonId, course.id).first()
+    `).bind(lessonId, course.id).first<any>()
 
     if (!lesson) {
       return c.render(
@@ -2586,7 +2586,7 @@ app.get('/cursos/:courseSlug/leccion/:lessonId', async (c) => {
     const progress = await c.env.DB.prepare(`
       SELECT * FROM student_progress 
       WHERE user_id = ? AND lesson_id = ? AND course_id = ?
-    `).bind(user.id, lessonId, course.id).first()
+    `).bind(user.id, lessonId, course.id).first<any>()
 
     // Obtener todas las lecciones del curso para navegación
     const allLessons = await c.env.DB.prepare(`
@@ -2594,13 +2594,13 @@ app.get('/cursos/:courseSlug/leccion/:lessonId', async (c) => {
       FROM lessons 
       WHERE course_id = ? AND published = 1
       ORDER BY order_index ASC
-    `).bind(course.id).all()
+    `).bind(course.id).all<any>()
 
     // Obtener lecciones completadas
     const completedLessons = await c.env.DB.prepare(`
       SELECT lesson_id FROM student_progress 
       WHERE user_id = ? AND course_id = ? AND completed = 1
-    `).bind(user.id, course.id).all()
+    `).bind(user.id, course.id).all<any>()
 
     const completedIds = new Set((completedLessons.results || []).map((p: any) => p.lesson_id))
 
@@ -2621,7 +2621,7 @@ app.get('/cursos/:courseSlug/leccion/:lessonId', async (c) => {
     // Obtener recursos de la lección
     const resources = await c.env.DB.prepare(`
       SELECT * FROM lesson_resources WHERE lesson_id = ? ORDER BY created_at ASC
-    `).bind(lessonId).all()
+    `).bind(lessonId).all<any>()
 
     return c.render(
       <div>
@@ -3355,7 +3355,7 @@ app.post('/api/lessons/:lessonId/complete', async (c) => {
       // Obtener enrollment_id
       const enrollment = await c.env.DB.prepare(`
         SELECT id FROM paid_enrollments WHERE user_id = ? AND course_id = ?
-      `).bind(user.id, courseId).first()
+      `).bind(user.id, courseId).first<any>()
 
       if (enrollment) {
         certificateId = await generateCertificate(c.env.DB, user.id, courseId, enrollment.id)
@@ -3471,7 +3471,7 @@ async function generateCertificate(db: D1Database, userId: number, courseId: num
     // Verificar si ya existe certificado
     const existing = await db.prepare(`
       SELECT * FROM certificates WHERE user_id = ? AND course_id = ?
-    `).bind(userId, courseId).first()
+    `).bind(userId, courseId).first<any>()
 
     if (existing) {
       return existing.id
@@ -3521,7 +3521,7 @@ app.get('/certificado/:certificateId', async (c) => {
       JOIN courses co ON c.course_id = co.id
       JOIN paid_enrollments pe ON c.enrollment_id = pe.id
       WHERE c.id = ? AND c.user_id = ?
-    `).bind(certificateId, user.id).first()
+    `).bind(certificateId, user.id).first<any>()
 
     if (!certificate) {
       return c.render(
@@ -3799,7 +3799,7 @@ app.get('/verificar/:code', async (c) => {
       JOIN users u ON c.user_id = u.id
       JOIN courses co ON c.course_id = co.id
       WHERE c.certificate_code = ? AND c.verified = 1
-    `).bind(code).first()
+    `).bind(code).first<any>()
 
     const isValid = !!certificate
 
@@ -3919,7 +3919,7 @@ app.get('/cursos/:courseSlug/quiz/:quizId', async (c) => {
     // Obtener información del curso
     const course = await c.env.DB.prepare(`
       SELECT id, title, slug FROM courses WHERE slug = ? AND published = 1
-    `).bind(courseSlug).first()
+    `).bind(courseSlug).first<any>()
 
     if (!course) {
       return c.render(
@@ -3955,7 +3955,7 @@ app.get('/cursos/:courseSlug/quiz/:quizId', async (c) => {
     // Obtener información del quiz
     const quiz = await c.env.DB.prepare(`
       SELECT * FROM quizzes WHERE id = ? AND course_id = ? AND published = 1
-    `).bind(quizId, course.id).first()
+    `).bind(quizId, course.id).first<any>()
 
     if (!quiz) {
       return c.render(
@@ -3975,7 +3975,7 @@ app.get('/cursos/:courseSlug/quiz/:quizId', async (c) => {
       SELECT * FROM quiz_attempts 
       WHERE quiz_id = ? AND user_id = ? 
       ORDER BY started_at DESC
-    `).bind(quizId, user.id).all()
+    `).bind(quizId, user.id).all<any>()
 
     const attemptCount = attempts.results?.length || 0
     const lastAttempt = attempts.results?.[0]
@@ -3991,7 +3991,7 @@ app.get('/cursos/:courseSlug/quiz/:quizId', async (c) => {
       SELECT * FROM quiz_questions 
       WHERE quiz_id = ? 
       ORDER BY ${quiz.randomize_questions ? 'RANDOM()' : 'order_index ASC'}
-    `).bind(quizId).all()
+    `).bind(quizId).all<any>()
 
     const questionsWithOptions = await Promise.all(
       (questions.results || []).map(async (q: any) => {
@@ -3999,7 +3999,7 @@ app.get('/cursos/:courseSlug/quiz/:quizId', async (c) => {
           SELECT id, option_text, order_index FROM quiz_options 
           WHERE question_id = ? 
           ORDER BY ${quiz.randomize_options ? 'RANDOM()' : 'order_index ASC'}
-        `).bind(q.id).all()
+        `).bind(q.id).all<any>()
         
         return {
           ...q,
@@ -4366,7 +4366,7 @@ app.post('/api/quiz/submit', async (c) => {
     // Obtener quiz
     const quiz = await c.env.DB.prepare(`
       SELECT * FROM quizzes WHERE id = ? AND course_id = ?
-    `).bind(quizId, courseId).first()
+    `).bind(quizId, courseId).first<any>()
 
     if (!quiz) {
       return c.json({ error: 'Quiz no encontrado' }, 404)
@@ -4376,7 +4376,7 @@ app.post('/api/quiz/submit', async (c) => {
     const attemptsCount = await c.env.DB.prepare(`
       SELECT COUNT(*) as count FROM quiz_attempts 
       WHERE quiz_id = ? AND user_id = ?
-    `).bind(quizId, user.id).first()
+    `).bind(quizId, user.id).first<any>()
 
     if (quiz.max_attempts && attemptsCount.count >= quiz.max_attempts) {
       return c.json({ error: 'Has alcanzado el número máximo de intentos' }, 403)
@@ -4385,7 +4385,7 @@ app.post('/api/quiz/submit', async (c) => {
     // Obtener todas las preguntas con respuestas correctas
     const questions = await c.env.DB.prepare(`
       SELECT * FROM quiz_questions WHERE quiz_id = ?
-    `).bind(quizId).all()
+    `).bind(quizId).all<any>()
 
     let totalPoints = 0
     let earnedPoints = 0
@@ -4397,7 +4397,7 @@ app.post('/api/quiz/submit', async (c) => {
       // Obtener respuestas correctas
       const correctOptions = await c.env.DB.prepare(`
         SELECT id FROM quiz_options WHERE question_id = ? AND is_correct = 1
-      `).bind(question.id).all()
+      `).bind(question.id).all<any>()
 
       const correctIds = new Set((correctOptions.results || []).map((o: any) => o.id))
       const userAnswers = answers[question.id] || []
@@ -4494,7 +4494,7 @@ app.get('/cursos/:courseSlug/quiz/:quizId/resultado/:attemptId', async (c) => {
     // Obtener curso
     const course = await c.env.DB.prepare(`
       SELECT id, title, slug FROM courses WHERE slug = ?
-    `).bind(courseSlug).first()
+    `).bind(courseSlug).first<any>()
 
     if (!course) {
       return c.render(<div><section className="section"><div className="container text-center"><h1>Curso no encontrado</h1></div></section></div>)
@@ -4504,7 +4504,7 @@ app.get('/cursos/:courseSlug/quiz/:quizId/resultado/:attemptId', async (c) => {
     const attempt = await c.env.DB.prepare(`
       SELECT * FROM quiz_attempts 
       WHERE id = ? AND user_id = ? AND quiz_id = ?
-    `).bind(attemptId, user.id, quizId).first()
+    `).bind(attemptId, user.id, quizId).first<any>()
 
     if (!attempt) {
       return c.render(<div><section className="section"><div className="container text-center"><h1>Resultado no encontrado</h1></div></section></div>)
@@ -4513,7 +4513,7 @@ app.get('/cursos/:courseSlug/quiz/:quizId/resultado/:attemptId', async (c) => {
     // Obtener quiz
     const quiz = await c.env.DB.prepare(`
       SELECT * FROM quizzes WHERE id = ?
-    `).bind(quizId).first()
+    `).bind(quizId).first<any>()
 
     // Obtener respuestas detalladas
     const answers = await c.env.DB.prepare(`
@@ -4527,14 +4527,14 @@ app.get('/cursos/:courseSlug/quiz/:quizId/resultado/:attemptId', async (c) => {
       JOIN quiz_questions qq ON qa.question_id = qq.id
       WHERE qa.attempt_id = ?
       ORDER BY qq.order_index ASC
-    `).bind(attemptId).all()
+    `).bind(attemptId).all<any>()
 
     // Obtener opciones para cada pregunta
     const detailedAnswers = await Promise.all(
       (answers.results || []).map(async (answer: any) => {
         const options = await c.env.DB.prepare(`
           SELECT * FROM quiz_options WHERE question_id = ? ORDER BY order_index
-        `).bind(answer.question_id).all()
+        `).bind(answer.question_id).all<any>()
 
         const selectedIds = JSON.parse(answer.selected_options)
         
@@ -4788,13 +4788,13 @@ app.get('/blog', async (c) => {
       WHERE published = 1 AND (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
       ORDER BY COALESCE(scheduled_at, created_at) DESC
       LIMIT ? OFFSET ?
-    `).bind(limit, offset).all()
+    `).bind(limit, offset).all<any>()
 
     // Contar total de posts
     const countResult = await c.env.DB.prepare(`
       SELECT COUNT(*) as total FROM blog_posts
       WHERE published = 1 AND (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
-    `).first()
+    `).first<any>()
 
     const posts = postsResult.results || []
     const total = countResult?.total || 0
@@ -4905,7 +4905,7 @@ app.get('/blog/:slug', async (c) => {
     const post = await c.env.DB.prepare(`
       SELECT * FROM blog_posts
       WHERE slug = ? AND published = 1 AND (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
-    `).bind(slug).first()
+    `).bind(slug).first<any>()
 
     if (!post) {
       return c.render(
@@ -4933,7 +4933,7 @@ app.get('/blog/:slug', async (c) => {
       WHERE published = 1 AND id != ?
       ORDER BY RANDOM()
       LIMIT 3
-    `).bind(post.id).all()
+    `).bind(post.id).all<any>()
 
     return c.render(
       <div>
@@ -5062,7 +5062,7 @@ app.get('/checkout/:courseId', async (c) => {
       SELECT id, title, subtitle, price, currency, featured_image, duration_weeks, level
       FROM courses 
       WHERE id = ? AND published = 1
-    `).bind(courseId).first()
+    `).bind(courseId).first<any>()
 
     if (!course) {
       return c.redirect('/cursos')
@@ -5072,7 +5072,7 @@ app.get('/checkout/:courseId', async (c) => {
     const enrollment = await c.env.DB.prepare(`
       SELECT id FROM paid_enrollments 
       WHERE user_id = ? AND course_id = ? AND payment_status = 'completed'
-    `).bind(user.id, courseId).first()
+    `).bind(user.id, courseId).first<any>()
 
     if (enrollment) {
       return c.redirect('/mi-aprendizaje')
@@ -5473,7 +5473,7 @@ app.get('/cursos', async (c) => {
       FROM courses 
       WHERE published = 1
       ORDER BY featured DESC, created_at DESC
-    `).all()
+    `).all<any>()
 
     const courses = result.results || []
 
@@ -5580,7 +5580,7 @@ app.get('/cursos/:slug', async (c) => {
     
     const result = await c.env.DB.prepare(`
       SELECT * FROM courses WHERE slug = ? AND published = 1
-    `).bind(slug).first()
+    `).bind(slug).first<any>()
 
     if (!result) {
       return c.render(
@@ -5616,7 +5616,7 @@ app.get('/cursos/:slug', async (c) => {
             WHERE course_id = ? AND published = 1 
             ORDER BY order_index ASC 
             LIMIT 1
-          `).bind(course.id).first()
+          `).bind(course.id).first<any>()
           
           firstLessonId = firstLesson?.id
         }
@@ -5685,7 +5685,7 @@ app.get('/cursos/:slug', async (c) => {
                 {/* Lo que aprenderás */}
                 <h3 style="margin-top: 40px;">¿Qué aprenderás?</h3>
                 <ul className="check-list">
-                  {whatYouLearn.map((item, idx) => (
+                {whatYouLearn.map((item: string, idx: number) => (
                     <li key={idx}>
                       <i className="fas fa-check"></i> {item}
                     </li>
@@ -5695,13 +5695,13 @@ app.get('/cursos/:slug', async (c) => {
                 {/* Contenido del curso */}
                 <h3 id="contenido" style="margin-top: 50px;">Contenido del curso</h3>
                 <div className="course-modules">
-                  {courseContent.map((module, idx) => (
+                {courseContent.map((module: any, idx: number) => (
                     <div className="module-item" key={idx}>
                       <h4>
                         <i className="fas fa-folder"></i> Módulo {module.module}: {module.title}
                       </h4>
                       <ul>
-                        {module.lessons && module.lessons.map((lesson, lessonIdx) => (
+                        {module.lessons && module.lessons.map((lesson: any, lessonIdx: number) => (
                           <li key={lessonIdx}>
                             <i className="fas fa-play-circle"></i> {lesson}
                           </li>
@@ -5714,7 +5714,7 @@ app.get('/cursos/:slug', async (c) => {
                 {/* Requisitos */}
                 <h3 style="margin-top: 50px;">Requisitos</h3>
                 <ul>
-                  {requirements.map((req, idx) => (
+                {requirements.map((req: string, idx: number) => (
                     <li key={idx}>{req}</li>
                   ))}
                 </ul>
@@ -5722,7 +5722,7 @@ app.get('/cursos/:slug', async (c) => {
                 {/* Para quién es */}
                 <h3 style="margin-top: 40px;">¿Para quién es este curso?</h3>
                 <ul>
-                  {targetAudience.map((audience, idx) => (
+                {targetAudience.map((audience: string, idx: number) => (
                     <li key={idx}>{audience}</li>
                   ))}
                 </ul>
@@ -5795,7 +5795,7 @@ app.get('/cursos/:slug', async (c) => {
                 </div>
                 <div className="form-group">
                   <label>¿Por qué te interesa este curso?</label>
-                  <textarea name="motivation" rows="4" placeholder="Cuéntanos brevemente..."></textarea>
+                  <textarea name="motivation" rows={4} placeholder="Cuéntanos brevemente..."></textarea>
                 </div>
                 <button type="submit" className="btn btn-primary btn-block btn-lg">
                   <i className="fas fa-paper-plane"></i> Solicitar información de inscripción
