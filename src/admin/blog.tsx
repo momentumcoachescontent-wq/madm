@@ -371,7 +371,7 @@ app.get('/', async (c) => {
                 </a>
               </td>
             </tr>
-          `))}
+          ))}
         </tbody>
       </table>
     </div>
