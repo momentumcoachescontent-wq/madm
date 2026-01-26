@@ -101,7 +101,7 @@ export async function getCourseProgress(db: D1Database, userId: number, courseId
 }
 
 import { Context } from 'hono';
-import { CloudflareBindings } from './index';
+import { CloudflareBindings } from './types';
 
 // Helper para obtener usuario actual desde cookies en una ruta
 export async function getCurrentUser(c: Context<{ Bindings: CloudflareBindings }>) {
