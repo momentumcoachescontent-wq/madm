@@ -1478,28 +1478,24 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   // Página: Listado de Blog
   publicRoutes.get('/blog', async (c) => {
     try {
+      const { listBlogPosts, countBlogPosts } = await import('../models/blog')
+
       // Obtener parámetros de paginación
       const page = parseInt(c.req.query('page') || '1')
       const limit = 12
       const offset = (page - 1) * limit
 
       // Obtener posts
-      const postsResult = await c.env.DB.prepare(`
-        SELECT id, title, slug, excerpt, hashtags, image_url, created_at
-        FROM blog_posts
-        WHERE published = 1 AND (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
-        ORDER BY COALESCE(scheduled_at, created_at) DESC
-        LIMIT ? OFFSET ?
-      `).bind(limit, offset).all<any>()
+      const posts = await listBlogPosts(c.env.DB, {
+        publishedOnly: true,
+        limit,
+        offset,
+        orderBy: 'scheduled_at'
+      })
 
       // Contar total de posts
-      const countResult = await c.env.DB.prepare(`
-        SELECT COUNT(*) as total FROM blog_posts
-        WHERE published = 1 AND (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
-      `).first<any>()
+      const total = await countBlogPosts(c.env.DB, { publishedOnly: true })
 
-      const posts = postsResult.results || []
-      const total = countResult?.total || 0
       const totalPages = Math.ceil(total / limit)
 
       return c.render(
@@ -1601,13 +1597,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   // Página: Post Individual
   publicRoutes.get('/blog/:slug', async (c) => {
     try {
+      const { getBlogPostBySlug, incrementBlogPostViews, listBlogPosts } = await import('../models/blog')
       const slug = c.req.param('slug')
 
       // Obtener el post
-      const post = await c.env.DB.prepare(`
-        SELECT * FROM blog_posts
-        WHERE slug = ? AND published = 1 AND (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
-      `).bind(slug).first<any>()
+      const post = await getBlogPostBySlug(c.env.DB, slug, { publishedOnly: true })
 
       if (!post) {
         return c.render(
@@ -1624,18 +1618,15 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
       }
 
       // Incrementar contador de vistas
-      await c.env.DB.prepare(`
-        UPDATE blog_posts SET views = views + 1 WHERE id = ?
-      `).bind(post.id).run()
+      await incrementBlogPostViews(c.env.DB, post.id)
 
       // Obtener posts relacionados
-      const relatedPosts = await c.env.DB.prepare(`
-        SELECT id, title, slug, excerpt, image_url
-        FROM blog_posts
-        WHERE published = 1 AND id != ?
-        ORDER BY RANDOM()
-        LIMIT 3
-      `).bind(post.id).all<any>()
+      const relatedPosts = await listBlogPosts(c.env.DB, {
+        publishedOnly: true,
+        excludeId: post.id,
+        limit: 3,
+        orderBy: 'random'
+      })
 
       return c.render(
         <div>
@@ -1701,12 +1692,12 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
             </div>
           </article>
 
-          {relatedPosts.results && relatedPosts.results.length > 0 && (
+          {relatedPosts && relatedPosts.length > 0 && (
             <section className="section bg-light">
               <div className="container">
                 <h2 className="section-title">También te puede interesar</h2>
                 <div className="blog-grid">
-                  {relatedPosts.results.map((related: any) => (
+                  {relatedPosts.map((related: any) => (
                     <article className="blog-card" key={related.id}>
                       <div className="blog-card-image">
                         <img src={related.image_url || 'https://images.unsplash.com/photo-1516534775068-ba3e7458af70?w=800'} alt={related.title} />

@@ -427,13 +427,12 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
 
 // LIST
 app.get('/', async (c) => {
-  const posts = await c.env.DB.prepare(
-    "SELECT id, title, slug, published, created_at, scheduled_at, views FROM blog_posts ORDER BY created_at DESC"
-  ).all()
+  const { listBlogPosts } = await import('../models/blog')
+  const posts = await listBlogPosts(c.env.DB, { orderBy: 'created_at' })
 
   return c.html(AdminLayout({
     title: 'Gestión de Blog',
-    children: ListPageHelper(posts.results || []),
+    children: ListPageHelper(posts),
     activeItem: 'blog',
     headerActions: html`<a href="/admin/blog-posts/new" class="btn btn-primary"><i class="fas fa-plus"></i> Nuevo Post</a>`
   }))
@@ -451,6 +450,7 @@ app.get('/new', (c) => {
 
 // VIEW VERSION / DIFF
 app.get('/versions/:versionId', async (c) => {
+  const { getBlogPostById } = await import('../models/blog')
   const versionId = c.req.param('versionId')
   const versioning = new VersioningService(c.env.DB)
   const version = await versioning.getVersion('blog_post', parseInt(versionId, 10))
@@ -458,10 +458,7 @@ app.get('/versions/:versionId', async (c) => {
   if (!version) return c.notFound()
 
   // Fetch live post for comparison
-  const post = await c.env.DB
-    .prepare('SELECT * FROM blog_posts WHERE id = ?')
-    .bind(version['post_id'])
-    .first()
+  const post = await getBlogPostById(c.env.DB, version['post_id'])
 
   // Calculate Diff
   const diffContent = versioning.compareText((post?.content as string) || '', version.content || '')
@@ -519,8 +516,9 @@ app.post('/versions/:versionId/delete', async (c) => {
 
 // EDIT FORM
 app.get('/:id/edit', async (c) => {
+  const { getBlogPostById } = await import('../models/blog')
   const id = c.req.param('id')
-  const post = await c.env.DB.prepare('SELECT * FROM blog_posts WHERE id = ?').bind(id).first()
+  const post = await getBlogPostById(c.env.DB, parseInt(id))
 
   if (!post) return c.notFound()
 
@@ -550,6 +548,7 @@ app.get('/:id/edit', async (c) => {
 
 // CREATE ACTION
 app.post('/', async (c) => {
+  const { createBlogPost } = await import('../models/blog')
   const body = await c.req.parseBody()
   const action = body['action'] as string // 'draft' or 'publish'
 
@@ -562,17 +561,17 @@ app.post('/', async (c) => {
   // If publishing, set published=1. If draft, published=0.
   // NOTE: For a NEW post, "Save Draft" means creating the post but not publishing it.
   const published = action === 'publish' ? 1 : 0
-  const scheduled_at = body['scheduled_at'] ? body['scheduled_at'] : null
+  const scheduled_at = body['scheduled_at'] ? body['scheduled_at'] as string : null
 
   const versioning = new VersioningService(c.env.DB)
 
   try {
     // 1. Create the main record (always needed for ID)
-    const res = await c.env.DB.prepare(
-      "INSERT INTO blog_posts (title, slug, content, excerpt, image_url, hashtags, published, scheduled_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-    ).bind(title, slug, content, excerpt, image_url, hashtags, published, scheduled_at).run()
+    const res = await createBlogPost(c.env.DB, {
+      title, slug, content, excerpt, image_url, hashtags, published, scheduled_at
+    })
 
-    const postId = res.meta.last_row_id as number
+    const postId = res.last_row_id as number
 
     // 2. Create the initial version
     const versionStatus = action === 'publish' ? 'published' : 'draft'
@@ -588,6 +587,7 @@ app.post('/', async (c) => {
 
 // UPDATE ACTION
 app.post('/:id', async (c) => {
+  const { getBlogPostById, updateBlogPost } = await import('../models/blog')
   const id = c.req.param('id')
   const body = await c.req.parseBody()
   const action = body['action'] as string // 'draft' or 'publish'
@@ -598,19 +598,19 @@ app.post('/:id', async (c) => {
   const excerpt = body['excerpt'] as string
   const image_url = body['image_url'] as string
   const hashtags = body['hashtags'] as string
-  const scheduled_at = body['scheduled_at'] ? body['scheduled_at'] : null
+  const scheduled_at = body['scheduled_at'] ? body['scheduled_at'] as string : null
 
   const versioning = new VersioningService(c.env.DB)
 
   try {
       // Get current live state to calculate summary if needed
-      const currentLive = await c.env.DB.prepare('SELECT * FROM blog_posts WHERE id = ?').bind(id).first()
+      const currentLive = await getBlogPostById(c.env.DB, parseInt(id))
 
       if (action === 'publish') {
         // Update Live
-        await c.env.DB.prepare(
-            "UPDATE blog_posts SET title = ?, slug = ?, content = ?, excerpt = ?, image_url = ?, hashtags = ?, published = 1, scheduled_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-        ).bind(title, slug, content, excerpt, image_url, hashtags, scheduled_at, id).run()
+        await updateBlogPost(c.env.DB, parseInt(id), {
+          title, slug, content, excerpt, image_url, hashtags, published: 1, scheduled_at
+        })
 
         // Create Published Version
         await versioning.createVersion('blog_post', parseInt(id), {
