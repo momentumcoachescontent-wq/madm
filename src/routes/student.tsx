@@ -1,187 +1,2057 @@
 import { Hono } from 'hono'
 import { CloudflareBindings } from '../types'
 
-const app = new Hono<{ Bindings: CloudflareBindings }>()
+export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
+  const studentRoutes = new Hono<{ Bindings: CloudflareBindings }>()
 
-// ===== PÁGINA: MI APRENDIZAJE (Dashboard del Estudiante) =====
+  // ===== PÁGINA: MI APRENDIZAJE (Dashboard del Estudiante) =====
 
-app.get('/mi-aprendizaje', async (c) => {
-  try {
-    // Verificar autenticación
-    const { getCurrentUser } = await import('../auth-utils')
-    const user = await getCurrentUser(c)
+  studentRoutes.get('/mi-aprendizaje', async (c) => {
+    try {
+      // Verificar autenticación
+      const { getCurrentUser } = await import('../auth-utils')
+      const user = await getCurrentUser(c)
 
-    if (!user) {
-      return c.redirect('/login')
-    }
+      if (!user) {
+        return c.redirect('/login')
+      }
 
-    // Obtener cursos inscritos con progreso
-    const enrollments = await c.env.DB.prepare(`
-      SELECT
-        pe.id as enrollment_id,
-        pe.enrolled_at,
-        pe.completed,
-        pe.completion_date,
-        c.id as course_id,
-        c.slug,
-        c.title,
-        c.subtitle,
-        c.featured_image,
-        c.duration_weeks,
-        c.level,
-        c.price
-      FROM paid_enrollments pe
-      JOIN courses c ON pe.course_id = c.id
-      WHERE pe.user_id = ? AND pe.payment_status = 'completed' AND pe.access_revoked = 0
-      ORDER BY pe.enrolled_at DESC
-    `).bind(user.id).all<any>()
+      // Obtener cursos inscritos con progreso
+      const enrollments = await c.env.DB.prepare(`
+        SELECT
+          pe.id as enrollment_id,
+          pe.enrolled_at,
+          pe.completed,
+          pe.completion_date,
+          c.id as course_id,
+          c.slug,
+          c.title,
+          c.subtitle,
+          c.featured_image,
+          c.duration_weeks,
+          c.level,
+          c.price
+        FROM paid_enrollments pe
+        JOIN courses c ON pe.course_id = c.id
+        WHERE pe.user_id = ? AND pe.payment_status = 'completed' AND pe.access_revoked = 0
+        ORDER BY pe.enrolled_at DESC
+      `).bind(user.id).all<any>()
 
-    // Calcular progreso de cada curso
-    const coursesWithProgress = await Promise.all(
-      (enrollments.results || []).map(async (enrollment: any) => {
-        const { getCourseProgress } = await import('../auth-utils')
-        const progress = await getCourseProgress(c.env.DB, user.id, enrollment.course_id)
+      // Calcular progreso de cada curso
+      const coursesWithProgress = await Promise.all(
+        (enrollments.results || []).map(async (enrollment: any) => {
+          const { getCourseProgress } = await import('../auth-utils')
+          const progress = await getCourseProgress(c.env.DB, user.id, enrollment.course_id)
 
-        // Obtener primera lección del curso
-        const firstLesson = await c.env.DB.prepare(`
-          SELECT id FROM lessons
-          WHERE course_id = ? AND published = 1
-          ORDER BY order_index ASC
-          LIMIT 1
-        `).bind(enrollment.course_id).first<any>()
+          // Obtener primera lección del curso
+          const firstLesson = await c.env.DB.prepare(`
+            SELECT id FROM lessons
+            WHERE course_id = ? AND published = 1
+            ORDER BY order_index ASC
+            LIMIT 1
+          `).bind(enrollment.course_id).first<any>()
 
-        // Obtener última lección en progreso (si existe)
-        const lastLesson = await c.env.DB.prepare(`
-          SELECT l.id
-          FROM student_progress sp
-          JOIN lessons l ON sp.lesson_id = l.id
-          WHERE sp.user_id = ? AND sp.course_id = ? AND l.published = 1
-          ORDER BY sp.updated_at DESC
-          LIMIT 1
-        `).bind(user.id, enrollment.course_id).first<any>()
+          // Obtener última lección en progreso (si existe)
+          const lastLesson = await c.env.DB.prepare(`
+            SELECT l.id
+            FROM student_progress sp
+            JOIN lessons l ON sp.lesson_id = l.id
+            WHERE sp.user_id = ? AND sp.course_id = ? AND l.published = 1
+            ORDER BY sp.updated_at DESC
+            LIMIT 1
+          `).bind(user.id, enrollment.course_id).first<any>()
 
-        // Obtener certificado si existe
-        const certificate = await c.env.DB.prepare(`
-          SELECT id FROM certificates
-          WHERE user_id = ? AND course_id = ?
-        `).bind(user.id, enrollment.course_id).first<any>()
+          // Obtener certificado si existe
+          const certificate = await c.env.DB.prepare(`
+            SELECT id FROM certificates
+            WHERE user_id = ? AND course_id = ?
+          `).bind(user.id, enrollment.course_id).first<any>()
 
-        return {
-          ...enrollment,
-          progress: progress.percentage,
-          completed_lessons: progress.completed,
-          total_lessons: progress.total,
-          next_lesson_id: lastLesson?.id || firstLesson?.id,
-          certificate_id: certificate?.id
-        }
-      })
-    )
+          return {
+            ...enrollment,
+            progress: progress.percentage,
+            completed_lessons: progress.completed,
+            total_lessons: progress.total,
+            next_lesson_id: lastLesson?.id || firstLesson?.id,
+            certificate_id: certificate?.id
+          }
+        })
+      )
 
-    return c.render(
-      <div>
-        <section className="hero hero-small">
-          <div className="container">
-            <h1>Mi Aprendizaje</h1>
-            <p className="lead">Bienvenido de vuelta, {user.name}</p>
-          </div>
-        </section>
+      return c.render(
+        <div>
+          <section className="hero hero-small">
+            <div className="container">
+              <h1>Mi Aprendizaje</h1>
+              <p className="lead">Bienvenido de vuelta, {user.name}</p>
+            </div>
+          </section>
 
-        <section className="section">
-          <div className="container">
-            <div className="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
-              <div>
-                <h2>Mis Cursos</h2>
-                <p style="color: #64748b; margin-top: 10px;">
-                  {coursesWithProgress.length === 0
-                    ? 'No tienes cursos inscritos todavía'
-                    : `Tienes ${coursesWithProgress.length} curso${coursesWithProgress.length > 1 ? 's' : ''} activo${coursesWithProgress.length > 1 ? 's' : ''}`
-                  }
-                </p>
+          <section className="section">
+            <div className="container">
+              <div className="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+                <div>
+                  <h2>Mis Cursos</h2>
+                  <p style="color: #64748b; margin-top: 10px;">
+                    {coursesWithProgress.length === 0
+                      ? 'No tienes cursos inscritos todavía'
+                      : `Tienes ${coursesWithProgress.length} curso${coursesWithProgress.length > 1 ? 's' : ''} activo${coursesWithProgress.length > 1 ? 's' : ''}`
+                    }
+                  </p>
+                </div>
+                <div>
+                  <a href="/cursos" className="btn btn-primary">
+                    <i className="fas fa-plus"></i> Explorar Cursos
+                  </a>
+                  <button onclick="logout()" className="btn btn-secondary" style="margin-left: 10px;">
+                    <i className="fas fa-sign-out-alt"></i> Cerrar Sesión
+                  </button>
+                </div>
               </div>
-              <div>
-                <a href="/cursos" className="btn btn-primary">
-                  <i className="fas fa-plus"></i> Explorar Cursos
-                </a>
-                <button onclick="logout()" className="btn btn-secondary" style="margin-left: 10px;">
-                  <i className="fas fa-sign-out-alt"></i> Cerrar Sesión
-                </button>
+
+              {coursesWithProgress.length === 0 ? (
+                <div className="empty-state" style="text-align: center; padding: 60px 20px; background: #f8fafc; border-radius: 12px;">
+                  <i className="fas fa-graduation-cap fa-4x" style="color: #cbd5e1; margin-bottom: 20px;"></i>
+                  <h3 style="color: #1e293b; margin-bottom: 15px;">Aún no tienes cursos</h3>
+                  <p style="color: #64748b; margin-bottom: 30px;">
+                    Explora nuestro catálogo y comienza tu transformación hoy
+                  </p>
+                  <a href="/cursos" className="btn btn-primary btn-lg">
+                    <i className="fas fa-search"></i> Explorar Cursos
+                  </a>
+                </div>
+              ) : (
+                <div className="courses-dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 30px;">
+                  {coursesWithProgress.map((course: any) => (
+                    <div className="dashboard-course-card" key={course.course_id} style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s;">
+                      <div style="position: relative; width: 100%; padding-top: 56.25%; background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);">
+                        {course.featured_image && (
+                          <img
+                            src={course.featured_image}
+                            alt={course.title}
+                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;"
+                          />
+                        )}
+                        <div style="position: absolute; top: 10px; right: 10px;">
+                          {course.completed ? (
+                            <span className="badge" style="background: #10b981; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">
+                              <i className="fas fa-check-circle"></i> Completado
+                            </span>
+                          ) : (
+                            <span className="badge" style="background: #f59e0b; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">
+                              <i className="fas fa-spinner"></i> En Progreso
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style="padding: 20px;">
+                        <h3 style="font-size: 1.2rem; color: #1e293b; margin-bottom: 10px; font-weight: 700;">
+                          {course.title}
+                        </h3>
+                        <p style="color: #64748b; font-size: 0.95rem; margin-bottom: 20px;">
+                          {course.subtitle}
+                        </p>
+
+                        {/* Progress Bar */}
+                        <div style="margin-bottom: 20px;">
+                          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="font-size: 0.9rem; color: #64748b;">Progreso</span>
+                            <span style="font-size: 0.9rem; font-weight: 600; color: #8b5cf6;">{course.progress}%</span>
+                          </div>
+                          <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 10px; overflow: hidden;">
+                            <div
+                              style={`width: ${course.progress}%; height: 100%; background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%); transition: width 0.3s;`}
+                            ></div>
+                          </div>
+                          <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.85rem; color: #94a3b8;">
+                            <span>{course.completed_lessons} / {course.total_lessons} lecciones</span>
+                            <span>{course.duration_weeks} semanas</span>
+                          </div>
+                        </div>
+
+                        <a href={course.next_lesson_id ? `/cursos/${course.slug}/leccion/${course.next_lesson_id}` : `/cursos/${course.slug}`} className="btn btn-primary btn-block">
+                          <i className="fas fa-play"></i> {course.progress > 0 ? 'Continuar Aprendiendo' : 'Comenzar Curso'}
+                        </a>
+
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;">
+                          <a href={`/cursos/${course.slug}`} className="btn btn-sm btn-outline" style="font-size: 0.85rem;">
+                            <i className="fas fa-list"></i> Ver Temario
+                          </a>
+                          {course.certificate_id && (
+                            <a href={`/certificado/${course.certificate_id}`} className="btn btn-sm btn-outline" style="font-size: 0.85rem; background: #10b981; color: white; border-color: #10b981;">
+                              <i className="fas fa-certificate"></i> Certificado
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Stats Section */}
+          {coursesWithProgress.length > 0 && (
+            <section className="section bg-light">
+              <div className="container">
+                <h2 style="text-align: center; margin-bottom: 40px;">Tu Progreso General</h2>
+                <div className="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 30px; max-width: 900px; margin: 0 auto;">
+                  <div className="stat-card" style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <i className="fas fa-book fa-3x" style="color: #8b5cf6; margin-bottom: 15px;"></i>
+                    <h3 style="font-size: 2.5rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;">
+                      {coursesWithProgress.length}
+                    </h3>
+                    <p style="color: #64748b;">Curso{coursesWithProgress.length > 1 ? 's' : ''} Activo{coursesWithProgress.length > 1 ? 's' : ''}</p>
+                  </div>
+
+                  <div className="stat-card" style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <i className="fas fa-tasks fa-3x" style="color: #10b981; margin-bottom: 15px;"></i>
+                    <h3 style="font-size: 2.5rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;">
+                      {coursesWithProgress.reduce((sum, c) => sum + c.completed_lessons, 0)}
+                    </h3>
+                    <p style="color: #64748b;">Lecciones Completadas</p>
+                  </div>
+
+                  <div className="stat-card" style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <i className="fas fa-certificate fa-3x" style="color: #f59e0b; margin-bottom: 15px;"></i>
+                    <h3 style="font-size: 2.5rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;">
+                      {coursesWithProgress.filter(c => c.completed).length}
+                    </h3>
+                    <p style="color: #64748b;">Curso{coursesWithProgress.filter(c => c.completed).length !== 1 ? 's' : ''} Completado{coursesWithProgress.filter(c => c.completed).length !== 1 ? 's' : ''}</p>
+                  </div>
+
+                  <div className="stat-card" style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <i className="fas fa-chart-line fa-3x" style="color: #ec4899; margin-bottom: 15px;"></i>
+                    <h3 style="font-size: 2.5rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;">
+                      {Math.round(coursesWithProgress.reduce((sum, c) => sum + c.progress, 0) / coursesWithProgress.length)}%
+                    </h3>
+                    <p style="color: #64748b;">Progreso Promedio</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <script dangerouslySetInnerHTML={{__html: `
+            async function logout() {
+              if (!confirm('¿Estás seguro que deseas cerrar sesión?')) return;
+
+              try {
+                const response = await fetch('/api/logout', { method: 'POST' });
+                if (response.ok) {
+                  window.location.href = '/';
+                }
+              } catch (error) {
+                console.error('Error al cerrar sesión:', error);
+                alert('Error al cerrar sesión. Por favor, intenta de nuevo.');
+              }
+            }
+          `}} />
+        </div>
+      )
+    } catch (error) {
+      console.error('Error al cargar dashboard:', error)
+      return c.render(
+        <div>
+          <section className="section">
+            <div className="container text-center">
+              <h1>Error al cargar tu aprendizaje</h1>
+              <p>Por favor, intenta de nuevo más tarde.</p>
+              <a href="/" className="btn btn-primary">Volver al inicio</a>
+            </div>
+          </section>
+        </div>
+      )
+    }
+  })
+
+  // ===== GESTIÓN DE LECCIONES =====
+
+  // Página: Ver lección individual
+  studentRoutes.get('/cursos/:courseSlug/leccion/:lessonId', async (c) => {
+    try {
+      const { getCurrentUser, userHasAccess } = await import('../auth-utils')
+      const user = await getCurrentUser(c)
+
+      if (!user) {
+        return c.redirect('/login')
+      }
+
+      const courseSlug = c.req.param('courseSlug')
+      const lessonId = parseInt(c.req.param('lessonId'))
+
+      // Obtener información del curso
+      const course = await c.env.DB.prepare(`
+        SELECT id, title, slug FROM courses WHERE slug = ? AND published = 1
+      `).bind(courseSlug).first<any>()
+
+      if (!course) {
+        return c.render(
+          <div>
+            <section className="section">
+              <div className="container text-center">
+                <h1>Curso no encontrado</h1>
+                <a href="/cursos" className="btn btn-primary">Ver Cursos</a>
+              </div>
+            </section>
+          </div>
+        )
+      }
+
+      // Verificar acceso al curso
+      const hasAccess = await userHasAccess(c.env.DB, user.id, course.id)
+
+      if (!hasAccess) {
+        return c.render(
+          <div>
+            <section className="section">
+              <div className="container text-center">
+                <i className="fas fa-lock fa-3x" style="color: #f59e0b; margin-bottom: 20px;"></i>
+                <h1>Acceso Restringido</h1>
+                <p className="lead">Necesitas inscribirte en este curso para ver esta lección.</p>
+                <a href={`/cursos/${courseSlug}`} className="btn btn-primary">Ver Curso</a>
+              </div>
+            </section>
+          </div>
+        )
+      }
+
+      // Obtener lección
+      const lesson = await c.env.DB.prepare(`
+        SELECT * FROM lessons WHERE id = ? AND course_id = ? AND published = 1
+      `).bind(lessonId, course.id).first<any>()
+
+      if (!lesson) {
+        return c.render(
+          <div>
+            <section className="section">
+              <div className="container text-center">
+                <h1>Lección no encontrada</h1>
+                <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
+              </div>
+            </section>
+          </div>
+        )
+      }
+
+      // Obtener progreso del estudiante
+      const progress = await c.env.DB.prepare(`
+        SELECT * FROM student_progress
+        WHERE user_id = ? AND lesson_id = ? AND course_id = ?
+      `).bind(user.id, lessonId, course.id).first<any>()
+
+      // Obtener todas las lecciones del curso para navegación
+      const allLessons = await c.env.DB.prepare(`
+        SELECT id, module_number, lesson_number, title, video_duration, is_preview
+        FROM lessons
+        WHERE course_id = ? AND published = 1
+        ORDER BY order_index ASC
+      `).bind(course.id).all<any>()
+
+      // Obtener lecciones completadas
+      const completedLessons = await c.env.DB.prepare(`
+        SELECT lesson_id FROM student_progress
+        WHERE user_id = ? AND course_id = ? AND completed = 1
+      `).bind(user.id, course.id).all<any>()
+
+      const completedIds = new Set((completedLessons.results || []).map((p: any) => p.lesson_id))
+
+      // Agrupar lecciones por módulo
+      const moduleMap = new Map()
+      for (const l of (allLessons.results || [])) {
+        if (!moduleMap.has(l.module_number)) {
+          moduleMap.set(l.module_number, [])
+        }
+        moduleMap.get(l.module_number).push(l)
+      }
+
+      // Encontrar lección anterior y siguiente
+      const currentIndex = (allLessons.results || []).findIndex((l: any) => l.id === lessonId)
+      const prevLesson = currentIndex > 0 ? (allLessons.results || [])[currentIndex - 1] : null
+      const nextLesson = currentIndex < (allLessons.results || []).length - 1 ? (allLessons.results || [])[currentIndex + 1] : null
+
+      // Obtener recursos de la lección
+      const resources = await c.env.DB.prepare(`
+        SELECT * FROM lesson_resources WHERE lesson_id = ? ORDER BY created_at ASC
+      `).bind(lessonId).all<any>()
+
+      return c.render(
+        <div>
+          <style dangerouslySetInnerHTML={{__html: `
+            .lesson-container {
+              max-width: 1400px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .lesson-layout {
+              display: grid;
+              grid-template-columns: 1fr 350px;
+              gap: 30px;
+              margin-top: 20px;
+            }
+            .lesson-main {
+              background: white;
+              border-radius: 12px;
+              overflow: hidden;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .video-container {
+              position: relative;
+              width: 100%;
+              padding-top: 56.25%;
+              background: #000;
+            }
+            .video-container iframe {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+            }
+            .lesson-content {
+              padding: 30px;
+            }
+            .lesson-sidebar {
+              position: sticky;
+              top: 20px;
+              height: fit-content;
+            }
+            .sidebar-section {
+              background: white;
+              border-radius: 12px;
+              padding: 20px;
+              margin-bottom: 20px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .lesson-list {
+              max-height: 600px;
+              overflow-y: auto;
+            }
+            .lesson-item {
+              padding: 12px;
+              margin-bottom: 8px;
+              border-radius: 8px;
+              cursor: pointer;
+              transition: all 0.2s;
+              border: 2px solid transparent;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+            }
+            .lesson-item:hover {
+              background: #f8fafc;
+            }
+            .lesson-item.active {
+              background: #ede9fe;
+              border-color: #8b5cf6;
+            }
+            .lesson-item.completed {
+              background: #dcfce7;
+            }
+            .lesson-checkbox {
+              width: 20px;
+              height: 20px;
+              border: 2px solid #cbd5e1;
+              border-radius: 4px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            }
+            .lesson-checkbox.checked {
+              background: #10b981;
+              border-color: #10b981;
+              color: white;
+            }
+            .module-header {
+              font-weight: 700;
+              color: #1e293b;
+              margin: 20px 0 10px 0;
+              padding-bottom: 8px;
+              border-bottom: 2px solid #e2e8f0;
+            }
+            .notes-area {
+              width: 100%;
+              min-height: 120px;
+              padding: 15px;
+              border: 2px solid #e2e8f0;
+              border-radius: 8px;
+              font-family: inherit;
+              resize: vertical;
+            }
+            .notes-area:focus {
+              outline: none;
+              border-color: #8b5cf6;
+            }
+            .resource-item {
+              display: flex;
+              align-items: center;
+              gap: 15px;
+              padding: 15px;
+              background: #f8fafc;
+              border-radius: 8px;
+              margin-bottom: 10px;
+              transition: all 0.2s;
+            }
+            .resource-item:hover {
+              background: #f1f5f9;
+            }
+            .resource-icon {
+              width: 40px;
+              height: 40px;
+              background: #8b5cf6;
+              color: white;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            }
+            @media (max-width: 968px) {
+              .lesson-layout {
+                grid-template-columns: 1fr;
+              }
+              .lesson-sidebar {
+                position: static;
+              }
+            }
+          `}} />
+
+          <div className="lesson-container">
+            {/* Breadcrumb */}
+            <div style="display: flex; align-items: center; gap: 10px; color: #64748b; margin-bottom: 20px;">
+              <a href="/mi-aprendizaje" style="color: #8b5cf6; text-decoration: none;">Mis Cursos</a>
+              <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
+              <a href={`/cursos/${courseSlug}`} style="color: #8b5cf6; text-decoration: none;">{course.title}</a>
+              <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
+              <span>Módulo {lesson.module_number}, Lección {lesson.lesson_number}</span>
+            </div>
+
+            <div className="lesson-layout">
+              {/* Main Content */}
+              <div className="lesson-main">
+                {/* Video */}
+                {lesson.video_url && (
+                  <div className="video-container">
+                    {progress?.last_position && progress.last_position > 10 && !progress.completed && (
+                      <div style="position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(139, 92, 246, 0.95); color: white; padding: 8px 15px; border-radius: 20px; font-size: 13px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;">
+                        <i className="fas fa-play-circle"></i>
+                        Continuar desde {Math.floor(progress.last_position / 60)}:{(progress.last_position % 60).toString().padStart(2, '0')}
+                      </div>
+                    )}
+                    <iframe
+                      src={lesson.video_url}
+                      title={lesson.title}
+                      frameborder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowfullscreen
+                    ></iframe>
+                  </div>
+                )}
+
+                {/* Lesson Content */}
+                <div className="lesson-content">
+                  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                    <div>
+                      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <span className="badge" style="background: #8b5cf6; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px;">
+                          Módulo {lesson.module_number}
+                        </span>
+                        <span style="color: #64748b; font-size: 14px;">
+                          Lección {lesson.lesson_number}
+                        </span>
+                      </div>
+                      <h1 style="font-size: 2rem; color: #1e293b; margin-bottom: 15px;">{lesson.title}</h1>
+                      {lesson.description && (
+                        <p style="color: #64748b; font-size: 1.1rem; line-height: 1.6;">{lesson.description}</p>
+                      )}
+                    </div>
+                    <button
+                      id="completeBtn"
+                      onclick="toggleComplete()"
+                      className="btn btn-success"
+                      style={`white-space: nowrap; ${progress?.completed ? 'background: #10b981;' : 'background: #64748b;'}`}
+                    >
+                      <i className={progress?.completed ? 'fas fa-check-circle' : 'far fa-circle'}></i>
+                      {progress?.completed ? 'Completada' : 'Marcar Completa'}
+                    </button>
+                  </div>
+
+                  {/* Navigation Buttons */}
+                  <div style="display: flex; gap: 10px; margin-bottom: 30px; padding-bottom: 30px; border-bottom: 2px solid #e2e8f0;">
+                    {prevLesson && (
+                      <a href={`/cursos/${courseSlug}/leccion/${prevLesson.id}`} className="btn btn-secondary">
+                        <i className="fas fa-arrow-left"></i> Anterior
+                      </a>
+                    )}
+                    {nextLesson && (
+                      <a href={`/cursos/${courseSlug}/leccion/${nextLesson.id}`} className="btn btn-primary" style="margin-left: auto;">
+                        Siguiente <i className="fas fa-arrow-right"></i>
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Lesson Content */}
+                  {lesson.content && (
+                    <div style="margin-bottom: 40px;">
+                      <h2 style="font-size: 1.5rem; color: #1e293b; margin-bottom: 20px;">Contenido de la Lección</h2>
+                      <div style="line-height: 1.8; color: #475569;" dangerouslySetInnerHTML={{__html: lesson.content}} />
+                    </div>
+                  )}
+
+                  {/* Resources */}
+                  {resources.results && resources.results.length > 0 && (
+                    <div style="margin-bottom: 40px;">
+                      <h2 style="font-size: 1.5rem; color: #1e293b; margin-bottom: 20px;">
+                        <i className="fas fa-download"></i> Recursos Descargables
+                      </h2>
+                      {resources.results.map((resource: any) => (
+                        <a href={resource.file_url} target="_blank" rel="noopener noreferrer" className="resource-item" style="text-decoration: none; color: inherit;">
+                          <div className="resource-icon">
+                            <i className={`fas fa-file-${resource.file_type === 'pdf' ? 'pdf' : resource.file_type === 'video' ? 'video' : 'alt'}`}></i>
+                          </div>
+                          <div style="flex: 1;">
+                            <h4 style="margin: 0 0 5px 0; color: #1e293b;">{resource.title}</h4>
+                            {resource.description && (
+                              <p style="margin: 0; color: #64748b; font-size: 14px;">{resource.description}</p>
+                            )}
+                            <div style="display: flex; gap: 15px; margin-top: 5px; font-size: 12px; color: #94a3b8;">
+                              <span><i className="fas fa-file"></i> {resource.file_type.toUpperCase()}</span>
+                              {resource.file_size && (
+                                <span><i className="fas fa-hdd"></i> {(resource.file_size / 1024).toFixed(0)} KB</span>
+                              )}
+                              <span><i className="fas fa-download"></i> {resource.downloads_count || 0} descargas</span>
+                            </div>
+                          </div>
+                          <i className="fas fa-external-link-alt" style="color: #8b5cf6;"></i>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Notes Section */}
+                  <div>
+                    <h2 style="font-size: 1.5rem; color: #1e293b; margin-bottom: 20px;">
+                      <i className="fas fa-sticky-note"></i> Mis Notas
+                    </h2>
+                    <textarea
+                      id="notesArea"
+                      className="notes-area"
+                      placeholder="Escribe tus notas sobre esta lección..."
+                    >{progress?.notes || ''}</textarea>
+                    <button onclick="saveNotes()" className="btn btn-primary" style="margin-top: 15px;">
+                      <i className="fas fa-save"></i> Guardar Notas
+                    </button>
+                    <span id="saveStatus" style="margin-left: 15px; color: #10b981; display: none;">
+                      <i className="fas fa-check"></i> Notas guardadas
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sidebar */}
+              <div className="lesson-sidebar">
+                {/* Progress Section */}
+                <div className="sidebar-section">
+                  <h3 style="margin: 0 0 15px 0; color: #1e293b; font-size: 1.1rem;">
+                    <i className="fas fa-chart-line" style="color: #8b5cf6;"></i> Tu Progreso
+                  </h3>
+                  <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                      <span style="color: #64748b; font-size: 14px;">Lecciones completadas</span>
+                      <span style="font-weight: 700; color: #1e293b;">{completedIds.size} / {allLessons.results?.length || 0}</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                      <div style={`width: ${((completedIds.size / (allLessons.results?.length || 1)) * 100).toFixed(0)}%; height: 100%; background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%); transition: width 0.3s;`}></div>
+                    </div>
+                    <p style="text-align: center; margin-top: 10px; font-size: 24px; font-weight: 700; color: #8b5cf6;">
+                      {((completedIds.size / (allLessons.results?.length || 1)) * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Course Content */}
+                <div className="sidebar-section">
+                  <h3 style="margin: 0 0 15px 0; color: #1e293b; font-size: 1.1rem;">
+                    <i className="fas fa-list"></i> Contenido del Curso
+                  </h3>
+                  <div className="lesson-list">
+                    {Array.from(moduleMap.entries()).map(([moduleNum, lessons]: [number, any[]]) => (
+                      <div key={moduleNum}>
+                        <div className="module-header">
+                          Módulo {moduleNum}
+                        </div>
+                        {lessons.map((l: any) => (
+                          <a
+                            href={`/cursos/${courseSlug}/leccion/${l.id}`}
+                            className={`lesson-item ${l.id === lessonId ? 'active' : ''} ${completedIds.has(l.id) ? 'completed' : ''}`}
+                            style="text-decoration: none; color: inherit;"
+                            key={l.id}
+                          >
+                            <div className={`lesson-checkbox ${completedIds.has(l.id) ? 'checked' : ''}`}>
+                              {completedIds.has(l.id) && <i className="fas fa-check" style="font-size: 12px;"></i>}
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                              <div style="font-weight: 500; color: #1e293b; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                {l.lesson_number}. {l.title}
+                              </div>
+                              {l.video_duration && (
+                                <div style="font-size: 12px; color: #64748b;">
+                                  <i className="fas fa-play-circle"></i> {Math.floor(l.video_duration / 60)}:{(l.video_duration % 60).toString().padStart(2, '0')} min
+                                </div>
+                              )}
+                            </div>
+                            {l.is_preview && (
+                              <span style="font-size: 11px; background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 10px;">
+                                Preview
+                              </span>
+                            )}
+                          </a>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <script dangerouslySetInnerHTML={{__html: `
+            let isCompleted = ${progress?.completed ? 'true' : 'false'};
+            const lessonId = ${lessonId};
+            const courseId = ${course.id};
+
+            async function toggleComplete() {
+              try {
+                const btn = document.getElementById('completeBtn');
+                btn.disabled = true;
+
+                const response = await fetch('/api/lessons/${lessonId}/complete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ completed: !isCompleted, courseId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                  isCompleted = !isCompleted;
+                  btn.innerHTML = isCompleted
+                    ? '<i class="fas fa-check-circle"></i> Completada'
+                    : '<i class="far fa-circle"></i> Marcar Completa';
+                  btn.style.background = isCompleted ? '#10b981' : '#64748b';
+
+                  // Mostrar notificación de certificado
+                  if (data.certificateGenerated && data.certificateId) {
+                    if (confirm('¡Felicitaciones! Has completado el curso al 100%. Tu certificado ha sido generado. ¿Deseas verlo ahora?')) {
+                      window.location.href = '/certificado/' + data.certificateId;
+                      return;
+                    }
+                  }
+
+                  // Reload page to update sidebar
+                  setTimeout(() => window.location.reload(), 500);
+                } else {
+                  alert('Error al actualizar el progreso');
+                }
+              } catch (error) {
+                console.error('Error:', error);
+                alert('Error al actualizar el progreso');
+              } finally {
+                document.getElementById('completeBtn').disabled = false;
+              }
+            }
+
+            async function saveNotes() {
+              try {
+                const notes = document.getElementById('notesArea').value;
+                const saveStatus = document.getElementById('saveStatus');
+
+                const response = await fetch('/api/lessons/${lessonId}/notes', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ notes, courseId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                  saveStatus.style.display = 'inline';
+                  setTimeout(() => saveStatus.style.display = 'none', 3000);
+                } else {
+                  alert('Error al guardar notas');
+                }
+              } catch (error) {
+                console.error('Error:', error);
+                alert('Error al guardar notas');
+              }
+            }
+
+            // Auto-save notes every 30 seconds
+            let notesTimeout;
+            document.getElementById('notesArea').addEventListener('input', () => {
+              clearTimeout(notesTimeout);
+              notesTimeout = setTimeout(saveNotes, 30000);
+            });
+
+            // ===== VIDEO PROGRESS TRACKING =====
+
+            const lastPosition = ${progress?.last_position || 0};
+            const videoDuration = ${lesson.video_duration || 0};
+            let videoProgressInterval;
+            let currentVideoTime = 0;
+            let currentVideoDuration = 0;
+            let videoReady = false;
+
+            // Function to save video progress
+            async function saveVideoProgress(position, duration) {
+              try {
+                await fetch('/api/lessons/${lessonId}/progress', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    position: Math.round(position),
+                    duration: Math.round(duration),
+                    courseId
+                  })
+                });
+              } catch (error) {
+                console.error('Error saving video progress:', error);
+              }
+            }
+
+            // YouTube IFrame API
+            function initYouTubeTracking() {
+              const iframe = document.querySelector('iframe');
+              if (!iframe || !iframe.src.includes('youtube.com')) return;
+
+              // Load YouTube IFrame API
+              if (!window.YT) {
+                const tag = document.createElement('script');
+                tag.src = 'https://www.youtube.com/iframe_api';
+                const firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+              }
+
+              // Initialize player when API is ready
+              window.onYouTubeIframeAPIReady = function() {
+                const player = new YT.Player(iframe, {
+                  events: {
+                    'onReady': function(event) {
+                      videoReady = true;
+                      currentVideoDuration = event.target.getDuration();
+
+                      // Restore last position if exists
+                      if (lastPosition > 0 && lastPosition < currentVideoDuration - 5) {
+                        event.target.seekTo(lastPosition, true);
+                        console.log('Restored video position:', lastPosition);
+                      }
+
+                      // Start tracking every 10 seconds
+                      videoProgressInterval = setInterval(() => {
+                        try {
+                          const currentTime = event.target.getCurrentTime();
+                          const duration = event.target.getDuration();
+
+                          if (currentTime > 0 && duration > 0) {
+                            currentVideoTime = currentTime;
+                            currentVideoDuration = duration;
+                            saveVideoProgress(currentTime, duration);
+                          }
+                        } catch (err) {
+                          console.error('Error tracking YouTube progress:', err);
+                        }
+                      }, 10000);
+                    },
+                    'onStateChange': function(event) {
+                      // Save on pause or end
+                      if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+                        try {
+                          const currentTime = event.target.getCurrentTime();
+                          const duration = event.target.getDuration();
+                          if (currentTime > 0 && duration > 0) {
+                            saveVideoProgress(currentTime, duration);
+                          }
+                        } catch (err) {
+                          console.error('Error saving on pause:', err);
+                        }
+                      }
+
+                      // Auto-complete when video ends
+                      if (event.data === YT.PlayerState.ENDED && !isCompleted) {
+                        setTimeout(toggleComplete, 1000);
+                      }
+                    }
+                  }
+                });
+              };
+
+              // If API already loaded
+              if (window.YT && window.YT.Player) {
+                window.onYouTubeIframeAPIReady();
+              }
+            }
+
+            // Vimeo Player API
+            function initVimeoTracking() {
+              const iframe = document.querySelector('iframe');
+              if (!iframe || !iframe.src.includes('vimeo.com')) return;
+
+              // Load Vimeo Player API
+              if (!window.Vimeo) {
+                const script = document.createElement('script');
+                script.src = 'https://player.vimeo.com/api/player.js';
+                script.onload = setupVimeoPlayer;
+                document.head.appendChild(script);
+              } else {
+                setupVimeoPlayer();
+              }
+
+              function setupVimeoPlayer() {
+                const player = new Vimeo.Player(iframe);
+
+                player.ready().then(() => {
+                  videoReady = true;
+
+                  player.getDuration().then(duration => {
+                    currentVideoDuration = duration;
+
+                    // Restore last position
+                    if (lastPosition > 0 && lastPosition < duration - 5) {
+                      player.setCurrentTime(lastPosition).then(() => {
+                        console.log('Restored video position:', lastPosition);
+                      });
+                    }
+                  });
+
+                  // Track current time
+                  player.on('timeupdate', data => {
+                    currentVideoTime = data.seconds;
+                    currentVideoDuration = data.duration;
+                  });
+
+                  // Start auto-save every 10 seconds
+                  videoProgressInterval = setInterval(() => {
+                    if (currentVideoTime > 0 && currentVideoDuration > 0) {
+                      saveVideoProgress(currentVideoTime, currentVideoDuration);
+                    }
+                  }, 10000);
+
+                  // Save on pause
+                  player.on('pause', () => {
+                    if (currentVideoTime > 0) {
+                      saveVideoProgress(currentVideoTime, currentVideoDuration);
+                    }
+                  });
+
+                  // Save and auto-complete on end
+                  player.on('ended', () => {
+                    saveVideoProgress(currentVideoTime, currentVideoDuration);
+                    if (!isCompleted) {
+                      setTimeout(toggleComplete, 1000);
+                    }
+                  });
+                });
+              }
+            }
+
+            // Generic HTML5 Video tracking (for self-hosted videos)
+            function initHTML5VideoTracking() {
+              const video = document.querySelector('video');
+              if (!video) return;
+
+              video.addEventListener('loadedmetadata', () => {
+                videoReady = true;
+                currentVideoDuration = video.duration;
+
+                // Restore position
+                if (lastPosition > 0 && lastPosition < video.duration - 5) {
+                  video.currentTime = lastPosition;
+                  console.log('Restored video position:', lastPosition);
+                }
+              });
+
+              // Track time updates
+              video.addEventListener('timeupdate', () => {
+                currentVideoTime = video.currentTime;
+                currentVideoDuration = video.duration;
+              });
+
+              // Auto-save every 10 seconds
+              videoProgressInterval = setInterval(() => {
+                if (video.currentTime > 0 && video.duration > 0) {
+                  saveVideoProgress(video.currentTime, video.duration);
+                }
+              }, 10000);
+
+              // Save on pause
+              video.addEventListener('pause', () => {
+                if (video.currentTime > 0) {
+                  saveVideoProgress(video.currentTime, video.duration);
+                }
+              });
+
+              // Save and auto-complete on end
+              video.addEventListener('ended', () => {
+                saveVideoProgress(video.currentTime, video.duration);
+                if (!isCompleted) {
+                  setTimeout(toggleComplete, 1000);
+                }
+              });
+            }
+
+            // Initialize appropriate tracking
+            setTimeout(() => {
+              initYouTubeTracking();
+              initVimeoTracking();
+              initHTML5VideoTracking();
+            }, 1000);
+
+            // Save progress before leaving page
+            window.addEventListener('beforeunload', () => {
+              if (currentVideoTime > 0 && currentVideoDuration > 0) {
+                // Use sendBeacon for reliable saving on page unload
+                const data = JSON.stringify({
+                  position: Math.round(currentVideoTime),
+                  duration: Math.round(currentVideoDuration),
+                  courseId
+                });
+                navigator.sendBeacon('/api/lessons/${lessonId}/progress', data);
+              }
+            });
+
+            // Clear interval on page unload
+            window.addEventListener('unload', () => {
+              if (videoProgressInterval) {
+                clearInterval(videoProgressInterval);
+              }
+            });
+          `}} />
+        </div>
+      )
+    } catch (error) {
+      console.error('Error al cargar lección:', error)
+      return c.render(
+        <div>
+          <section className="section">
+            <div className="container text-center">
+              <h1>Error al cargar la lección</h1>
+              <p>Por favor, intenta de nuevo más tarde.</p>
+              <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
+            </div>
+          </section>
+        </div>
+      )
+    }
+  })
+
+  // ===== SISTEMA DE CERTIFICADOS =====
+
+  // Página: Ver Certificado
+  studentRoutes.get('/certificado/:certificateId', async (c) => {
+    try {
+      const { getCurrentUser } = await import('../auth-utils')
+      const user = await getCurrentUser(c)
+
+      if (!user) {
+        return c.redirect('/login')
+      }
+
+      const certificateId = parseInt(c.req.param('certificateId'))
+
+      // Obtener certificado con información del usuario y curso
+      const certificate = await c.env.DB.prepare(`
+        SELECT
+          c.*,
+          u.name as user_name,
+          u.email as user_email,
+          co.title as course_title,
+          co.subtitle as course_subtitle,
+          co.duration_weeks,
+          pe.enrolled_at,
+          pe.completion_date
+        FROM certificates c
+        JOIN users u ON c.user_id = u.id
+        JOIN courses co ON c.course_id = co.id
+        JOIN paid_enrollments pe ON c.enrollment_id = pe.id
+        WHERE c.id = ? AND c.user_id = ?
+      `).bind(certificateId, user.id).first<any>()
+
+      if (!certificate) {
+        return c.render(
+          <div>
+            <section className="section">
+              <div className="container text-center">
+                <h1>Certificado no encontrado</h1>
+                <p>No tienes acceso a este certificado o no existe.</p>
+                <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
+              </div>
+            </section>
+          </div>
+        )
+      }
+
+      const issueDate = new Date(certificate.issue_date)
+      const completionDate = certificate.completion_date ? new Date(certificate.completion_date) : issueDate
+
+      return c.render(
+        <div>
+          <style dangerouslySetInnerHTML={{__html: `
+            @media print {
+              .no-print { display: none !important; }
+              .certificate-container { box-shadow: none; margin: 0; padding: 0; }
+              body { background: white; }
+            }
+            .certificate-container {
+              max-width: 1000px;
+              margin: 40px auto;
+              background: white;
+              padding: 60px;
+              box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+              border: 10px solid #8b5cf6;
+              border-radius: 8px;
+              position: relative;
+            }
+            .certificate-border {
+              position: absolute;
+              top: 20px;
+              left: 20px;
+              right: 20px;
+              bottom: 20px;
+              border: 2px solid #d4b5ff;
+              pointer-events: none;
+            }
+            .certificate-header {
+              text-align: center;
+              margin-bottom: 40px;
+              position: relative;
+              z-index: 1;
+            }
+            .certificate-logo {
+              font-size: 4rem;
+              color: #8b5cf6;
+              margin-bottom: 20px;
+            }
+            .certificate-title {
+              font-size: 3rem;
+              font-weight: 900;
+              color: #1e293b;
+              text-transform: uppercase;
+              letter-spacing: 2px;
+              margin-bottom: 10px;
+            }
+            .certificate-subtitle {
+              font-size: 1.2rem;
+              color: #64748b;
+              font-weight: 300;
+            }
+            .certificate-body {
+              text-align: center;
+              margin: 50px 0;
+              position: relative;
+              z-index: 1;
+            }
+            .certificate-text {
+              font-size: 1.3rem;
+              color: #475569;
+              margin-bottom: 30px;
+              line-height: 1.8;
+            }
+            .recipient-name {
+              font-size: 3.5rem;
+              font-weight: 700;
+              color: #8b5cf6;
+              margin: 30px 0;
+              font-family: 'Georgia', serif;
+              border-bottom: 3px solid #8b5cf6;
+              display: inline-block;
+              padding-bottom: 10px;
+            }
+            .course-name {
+              font-size: 2rem;
+              font-weight: 600;
+              color: #1e293b;
+              margin: 30px 0;
+            }
+            .certificate-footer {
+              display: flex;
+              justify-content: space-around;
+              margin-top: 60px;
+              padding-top: 40px;
+              border-top: 2px solid #e2e8f0;
+              position: relative;
+              z-index: 1;
+            }
+            .signature-block {
+              text-align: center;
+            }
+            .signature-line {
+              width: 250px;
+              border-bottom: 2px solid #1e293b;
+              margin: 20px auto 10px;
+            }
+            .signature-label {
+              font-weight: 600;
+              color: #1e293b;
+              font-size: 1rem;
+            }
+            .certificate-meta {
+              text-align: center;
+              margin-top: 40px;
+              color: #64748b;
+              font-size: 0.9rem;
+              position: relative;
+              z-index: 1;
+            }
+            .verification-code {
+              display: inline-block;
+              background: #f8fafc;
+              padding: 10px 20px;
+              border-radius: 6px;
+              font-family: monospace;
+              font-weight: 600;
+              color: #8b5cf6;
+              border: 2px solid #e2e8f0;
+              margin-top: 10px;
+            }
+            .action-buttons {
+              text-align: center;
+              margin: 30px 0;
+              padding: 20px;
+              background: #f8fafc;
+              border-radius: 8px;
+            }
+            .watermark {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              font-size: 15rem;
+              color: #f8fafc;
+              opacity: 0.3;
+              font-weight: 900;
+              z-index: 0;
+              pointer-events: none;
+            }
+          `}} />
+
+          <div className="action-buttons no-print">
+            <button onclick="window.print()" className="btn btn-primary btn-lg">
+              <i className="fas fa-print"></i> Imprimir Certificado
+            </button>
+            <a href="/mi-aprendizaje" className="btn btn-secondary btn-lg" style="margin-left: 15px;">
+              <i className="fas fa-arrow-left"></i> Volver a Mis Cursos
+            </a>
+            <button onclick="downloadPDF()" className="btn btn-secondary btn-lg" style="margin-left: 15px;">
+              <i className="fas fa-download"></i> Descargar PDF
+            </button>
+          </div>
+
+          <div className="certificate-container">
+            <div className="certificate-border"></div>
+            <div className="watermark">★</div>
+
+            <div className="certificate-header">
+              <div className="certificate-logo">
+                <i className="fas fa-brain"></i>
+              </div>
+              <h1 className="certificate-title">Certificado de Finalización</h1>
+              <p className="certificate-subtitle">Más Allá del Miedo</p>
+            </div>
+
+            <div className="certificate-body">
+              <p className="certificate-text">
+                Por medio del presente se certifica que
+              </p>
+
+              <div className="recipient-name">{certificate.user_name}</div>
+
+              <p className="certificate-text">
+                ha completado satisfactoriamente el curso
+              </p>
+
+              <div className="course-name">{certificate.course_title}</div>
+
+              {certificate.course_subtitle && (
+                <p className="certificate-text" style="font-size: 1.1rem; color: #64748b;">
+                  {certificate.course_subtitle}
+                </p>
+              )}
+
+              <p className="certificate-text" style="margin-top: 40px;">
+                Duración: {certificate.duration_weeks} semanas<br/>
+                Fecha de finalización: {completionDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+
+            <div className="certificate-footer">
+              <div className="signature-block">
+                <div className="signature-line"></div>
+                <p className="signature-label">Ernesto Alvarez</p>
+                <p style="color: #64748b; font-size: 0.9rem;">Autor y Facilitador</p>
+              </div>
+
+              <div className="signature-block">
+                <div className="signature-line"></div>
+                <p className="signature-label">Más Allá del Miedo</p>
+                <p style="color: #64748b; font-size: 0.9rem;">Plataforma Educativa</p>
               </div>
             </div>
 
-            {coursesWithProgress.length === 0 ? (
-              <div className="empty-state" style="text-align: center; padding: 60px 20px; background: #f8fafc; border-radius: 12px;">
-                <i className="fas fa-graduation-cap fa-4x" style="color: #cbd5e1; margin-bottom: 20px;"></i>
-                <h3 style="color: #1e293b; margin-bottom: 15px;">Aún no tienes cursos</h3>
-                <p style="color: #64748b; margin-bottom: 30px;">
-                  Explora nuestro catálogo y comienza tu transformación hoy
-                </p>
-                <a href="/cursos" className="btn btn-primary btn-lg">
-                  <i className="fas fa-search"></i> Explorar Cursos
-                </a>
+            <div className="certificate-meta">
+              <p>Código de Verificación</p>
+              <div className="verification-code">{certificate.certificate_code}</div>
+              <p style="margin-top: 20px; font-size: 0.85rem;">
+                Verifica la autenticidad de este certificado en:<br/>
+                <strong>https://masalladelmiedo.com/verificar/{certificate.certificate_code}</strong>
+              </p>
+              <p style="margin-top: 20px; font-size: 0.8rem; color: #94a3b8;">
+                Emitido el {issueDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+          </div>
+
+          <script dangerouslySetInnerHTML={{__html: `
+            function downloadPDF() {
+              // En producción, esto llamaría a una API para generar PDF
+              // Por ahora, simplemente imprime
+              alert('Usa el botón de imprimir y selecciona "Guardar como PDF" en tu navegador.');
+              window.print();
+            }
+          `}} />
+        </div>
+      )
+    } catch (error) {
+      console.error('Error al cargar certificado:', error)
+      return c.render(
+        <div>
+          <section className="section">
+            <div className="container text-center">
+              <h1>Error al cargar el certificado</h1>
+              <p>Por favor, intenta de nuevo más tarde.</p>
+              <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
+            </div>
+          </section>
+        </div>
+      )
+    }
+  })
+
+  // ===== SISTEMA DE QUIZZES =====
+
+  // Página: Tomar Quiz
+  studentRoutes.get('/cursos/:courseSlug/quiz/:quizId', async (c) => {
+    try {
+      const { getCurrentUser, userHasAccess } = await import('../auth-utils')
+      const user = await getCurrentUser(c)
+
+      if (!user) {
+        return c.redirect('/login')
+      }
+
+      const courseSlug = c.req.param('courseSlug')
+      const quizId = parseInt(c.req.param('quizId'))
+
+      // Obtener información del curso
+      const course = await c.env.DB.prepare(`
+        SELECT id, title, slug FROM courses WHERE slug = ? AND published = 1
+      `).bind(courseSlug).first<any>()
+
+      if (!course) {
+        return c.render(
+          <div>
+            <section className="section">
+              <div className="container text-center">
+                <h1>Curso no encontrado</h1>
+                <a href="/cursos" className="btn btn-primary">Ver Cursos</a>
               </div>
-            ) : (
-              <div className="courses-dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 30px;">
-                {coursesWithProgress.map((course: any) => (
-                  <div className="dashboard-course-card" key={course.course_id} style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s;">
-                    <div style="position: relative; width: 100%; padding-top: 56.25%; background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);">
-                      {course.featured_image && (
-                        <img
-                          src={course.featured_image}
-                          alt={course.title}
-                          style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;"
+            </section>
+          </div>
+        )
+      }
+
+      // Verificar acceso al curso
+      const hasAccess = await userHasAccess(c.env.DB, user.id, course.id)
+
+      if (!hasAccess) {
+        return c.render(
+          <div>
+            <section className="section">
+              <div className="container text-center">
+                <i className="fas fa-lock fa-3x" style="color: #f59e0b; margin-bottom: 20px;"></i>
+                <h1>Acceso Restringido</h1>
+                <p className="lead">Necesitas estar inscrito en este curso para tomar esta evaluación.</p>
+                <a href={`/cursos/${courseSlug}`} className="btn btn-primary">Ver Curso</a>
+              </div>
+            </section>
+          </div>
+        )
+      }
+
+      // Obtener información del quiz
+      const quiz = await c.env.DB.prepare(`
+        SELECT * FROM quizzes WHERE id = ? AND course_id = ? AND published = 1
+      `).bind(quizId, course.id).first<any>()
+
+      if (!quiz) {
+        return c.render(
+          <div>
+            <section className="section">
+              <div className="container text-center">
+                <h1>Evaluación no encontrada</h1>
+                <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
+              </div>
+            </section>
+          </div>
+        )
+      }
+
+      // Verificar intentos previos
+      const attempts = await c.env.DB.prepare(`
+        SELECT * FROM quiz_attempts
+        WHERE quiz_id = ? AND user_id = ?
+        ORDER BY started_at DESC
+      `).bind(quizId, user.id).all<any>()
+
+      const attemptCount = attempts.results?.length || 0
+      const lastAttempt = attempts.results?.[0]
+      const canRetake = !quiz.max_attempts || attemptCount < quiz.max_attempts
+
+      // Si ya completó y pasó, mostrar resultados
+      if (lastAttempt && lastAttempt.passed && !canRetake) {
+        return c.redirect(`/cursos/${courseSlug}/quiz/${quizId}/resultado/${lastAttempt.id}`)
+      }
+
+      // Obtener preguntas con opciones
+      const questions = await c.env.DB.prepare(`
+        SELECT * FROM quiz_questions
+        WHERE quiz_id = ?
+        ORDER BY ${quiz.randomize_questions ? 'RANDOM()' : 'order_index ASC'}
+      `).bind(quizId).all<any>()
+
+      const questionsWithOptions = await Promise.all(
+        (questions.results || []).map(async (q: any) => {
+          const options = await c.env.DB.prepare(`
+            SELECT id, option_text, order_index FROM quiz_options
+            WHERE question_id = ?
+            ORDER BY ${quiz.randomize_options ? 'RANDOM()' : 'order_index ASC'}
+          `).bind(q.id).all<any>()
+
+          return {
+            ...q,
+            options: options.results || []
+          }
+        })
+      )
+
+      const totalPoints = questionsWithOptions.reduce((sum, q: any) => sum + q.points, 0)
+
+      return c.render(
+        <div>
+          <style dangerouslySetInnerHTML={{__html: `
+            .quiz-container {
+              max-width: 900px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .quiz-header {
+              background: white;
+              border-radius: 12px;
+              padding: 30px;
+              margin-bottom: 30px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .quiz-info {
+              display: flex;
+              gap: 30px;
+              margin-top: 20px;
+              flex-wrap: wrap;
+            }
+            .quiz-info-item {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              color: #64748b;
+            }
+            .question-card {
+              background: white;
+              border-radius: 12px;
+              padding: 30px;
+              margin-bottom: 20px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .question-number {
+              background: #8b5cf6;
+              color: white;
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: 700;
+              margin-bottom: 15px;
+            }
+            .option-item {
+              padding: 15px 20px;
+              margin: 10px 0;
+              border: 2px solid #e2e8f0;
+              border-radius: 8px;
+              cursor: pointer;
+              transition: all 0.2s;
+              display: flex;
+              align-items: center;
+              gap: 15px;
+            }
+            .option-item:hover {
+              border-color: #8b5cf6;
+              background: #f5f3ff;
+            }
+            .option-item input[type="radio"],
+            .option-item input[type="checkbox"] {
+              width: 20px;
+              height: 20px;
+              cursor: pointer;
+            }
+            .option-item.selected {
+              border-color: #8b5cf6;
+              background: #ede9fe;
+            }
+            .quiz-timer {
+              position: fixed;
+              top: 80px;
+              right: 20px;
+              background: white;
+              padding: 15px 20px;
+              border-radius: 12px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+              z-index: 100;
+            }
+            .timer-display {
+              font-size: 1.5rem;
+              font-weight: 700;
+              color: #1e293b;
+            }
+            .timer-display.warning {
+              color: #f59e0b;
+            }
+            .timer-display.danger {
+              color: #ef4444;
+              animation: pulse 1s infinite;
+            }
+            @keyframes pulse {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0.7; }
+            }
+            @media (max-width: 768px) {
+              .quiz-timer {
+                position: static;
+                margin-bottom: 20px;
+              }
+            }
+          `}} />
+
+          <div className="quiz-container">
+            {/* Header */}
+            <div style="display: flex; align-items: center; gap: 10px; color: #64748b; margin-bottom: 20px;">
+              <a href="/mi-aprendizaje" style="color: #8b5cf6; text-decoration: none;">Mis Cursos</a>
+              <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
+              <a href={`/cursos/${courseSlug}`} style="color: #8b5cf6; text-decoration: none;">{course.title}</a>
+              <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
+              <span>Evaluación</span>
+            </div>
+
+            <div className="quiz-header">
+              <div style="display: flex; align-items: start; justify-content: space-between;">
+                <div>
+                  <h1 style="font-size: 2rem; color: #1e293b; margin-bottom: 10px;">{quiz.title}</h1>
+                  {quiz.description && (
+                    <p style="color: #64748b; font-size: 1.1rem; line-height: 1.6;">{quiz.description}</p>
+                  )}
+                </div>
+                <div style="text-align: right;">
+                  <div style="background: #ede9fe; color: #8b5cf6; padding: 8px 16px; border-radius: 20px; font-weight: 600; margin-bottom: 10px;">
+                    Intento {attemptCount + 1}/{quiz.max_attempts || '∞'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="quiz-info">
+                <div className="quiz-info-item">
+                  <i className="fas fa-list-ol" style="color: #8b5cf6;"></i>
+                  <span>{questionsWithOptions.length} preguntas</span>
+                </div>
+                <div className="quiz-info-item">
+                  <i className="fas fa-star" style="color: #f59e0b;"></i>
+                  <span>{totalPoints} puntos totales</span>
+                </div>
+                <div className="quiz-info-item">
+                  <i className="fas fa-check-circle" style="color: #10b981;"></i>
+                  <span>{quiz.passing_score}% para aprobar</span>
+                </div>
+                {quiz.time_limit && (
+                  <div className="quiz-info-item">
+                    <i className="fas fa-clock" style="color: #ec4899;"></i>
+                    <span>{quiz.time_limit} minutos</span>
+                  </div>
+                )}
+              </div>
+
+              {attemptCount > 0 && lastAttempt && (
+                <div style="margin-top: 20px; padding: 15px; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                  <strong>Último intento:</strong> {lastAttempt.score.toFixed(0)}%
+                  {lastAttempt.passed ?
+                    <span style="color: #10b981; margin-left: 10px;"><i className="fas fa-check-circle"></i> Aprobado</span> :
+                    <span style="color: #ef4444; margin-left: 10px;"><i className="fas fa-times-circle"></i> No aprobado</span>
+                  }
+                </div>
+              )}
+            </div>
+
+            {/* Timer */}
+            {quiz.time_limit && (
+              <div className="quiz-timer">
+                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 5px;">
+                  <i className="fas fa-clock"></i> Tiempo restante
+                </div>
+                <div className="timer-display" id="timerDisplay">{quiz.time_limit}:00</div>
+              </div>
+            )}
+
+            {/* Form */}
+            <form id="quizForm">
+              {questionsWithOptions.map((question: any, idx: number) => (
+                <div className="question-card" key={question.id}>
+                  <div className="question-number">{idx + 1}</div>
+                  <h3 style="font-size: 1.3rem; color: #1e293b; margin-bottom: 20px; line-height: 1.6;">
+                    {question.question_text}
+                  </h3>
+                  <div className="options-list">
+                    {question.options.map((option: any) => (
+                      <label
+                        className="option-item"
+                        key={option.id}
+                        onclick="this.classList.toggle('selected')"
+                      >
+                        <input
+                          type={question.question_type === 'multiple_select' ? 'checkbox' : 'radio'}
+                          name={`question_${question.id}`}
+                          value={option.id}
+                          required={idx === 0}
                         />
-                      )}
-                      <div style="position: absolute; top: 10px; right: 10px;">
-                        {course.completed ? (
-                          <span className="badge" style="background: #10b981; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">
-                            <i className="fas fa-check-circle"></i> Completado
-                          </span>
-                        ) : (
-                          <span className="badge" style="background: #f59e0b; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;">
-                            <i className="fas fa-spinner"></i> En Progreso
-                          </span>
-                        )}
+                        <span style="flex: 1; font-size: 1.05rem;">{option.option_text}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              <div style="background: white; border-radius: 12px; padding: 30px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <button type="submit" className="btn btn-primary btn-lg">
+                  <i className="fas fa-check-circle"></i> Enviar Evaluación
+                </button>
+                <p style="color: #64748b; margin-top: 15px; font-size: 0.95rem;">
+                  Revisa tus respuestas antes de enviar. No podrás cambiarlas después.
+                </p>
+              </div>
+            </form>
+          </div>
+
+          <script dangerouslySetInnerHTML={{__html: `
+            const quizId = ${quizId};
+            const courseId = ${course.id};
+            const timeLimit = ${quiz.time_limit || 0};
+            let timeRemaining = timeLimit * 60; // segundos
+            let timerInterval;
+            let startTime = Date.now();
+
+            // Iniciar timer si hay límite de tiempo
+            if (timeLimit > 0) {
+              timerInterval = setInterval(() => {
+                timeRemaining--;
+
+                const minutes = Math.floor(timeRemaining / 60);
+                const seconds = timeRemaining % 60;
+                const display = minutes + ':' + seconds.toString().padStart(2, '0');
+
+                const timerEl = document.getElementById('timerDisplay');
+                timerEl.textContent = display;
+
+                // Cambiar colores según tiempo restante
+                timerEl.classList.remove('warning', 'danger');
+                if (timeRemaining <= 60) {
+                  timerEl.classList.add('danger');
+                } else if (timeRemaining <= 180) {
+                  timerEl.classList.add('warning');
+                }
+
+                // Auto-submit cuando se acaba el tiempo
+                if (timeRemaining <= 0) {
+                  clearInterval(timerInterval);
+                  alert('¡Tiempo agotado! La evaluación se enviará automáticamente.');
+                  document.getElementById('quizForm').dispatchEvent(new Event('submit'));
+                }
+              }, 1000);
+            }
+
+            // Manejar envío del formulario
+            document.getElementById('quizForm').addEventListener('submit', async (e) => {
+              e.preventDefault();
+
+              if (timerInterval) clearInterval(timerInterval);
+
+              if (!confirm('¿Estás seguro de enviar la evaluación? No podrás cambiar tus respuestas.')) {
+                if (timerInterval && timeRemaining > 0) {
+                  timerInterval = setInterval(() => { /* reiniciar timer */ }, 1000);
+                }
+                return;
+              }
+
+              const formData = new FormData(e.target);
+              const answers = {};
+
+              // Recopilar respuestas
+              for (let [key, value] of formData.entries()) {
+                if (key.startsWith('question_')) {
+                  const questionId = key.replace('question_', '');
+                  if (!answers[questionId]) {
+                    answers[questionId] = [];
+                  }
+                  answers[questionId].push(parseInt(value));
+                }
+              }
+
+              const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+
+              try {
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+
+                const response = await fetch('/api/quiz/submit', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    quizId,
+                    courseId,
+                    answers,
+                    timeTaken
+                  })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                  window.location.href = '/cursos/${courseSlug}/quiz/' + quizId + '/resultado/' + data.attemptId;
+                } else {
+                  alert('Error: ' + (data.error || 'No se pudo enviar la evaluación'));
+                  submitBtn.disabled = false;
+                  submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Enviar Evaluación';
+                }
+              } catch (error) {
+                console.error('Error:', error);
+                alert('Error al enviar la evaluación. Por favor, intenta de nuevo.');
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Enviar Evaluación';
+              }
+            });
+
+            // Prevenir salida accidental
+            window.addEventListener('beforeunload', (e) => {
+              e.preventDefault();
+              e.returnValue = '';
+            });
+          `}} />
+        </div>
+      )
+    } catch (error) {
+      console.error('Error al cargar quiz:', error)
+      return c.render(
+        <div>
+          <section className="section">
+            <div className="container text-center">
+              <h1>Error al cargar la evaluación</h1>
+              <p>Por favor, intenta de nuevo más tarde.</p>
+              <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
+            </div>
+          </section>
+        </div>
+      )
+    }
+  })
+
+  // Página: Resultado del Quiz
+  studentRoutes.get('/cursos/:courseSlug/quiz/:quizId/resultado/:attemptId', async (c) => {
+    try {
+      const { getCurrentUser } = await import('../auth-utils')
+      const user = await getCurrentUser(c)
+
+      if (!user) {
+        return c.redirect('/login')
+      }
+
+      const courseSlug = c.req.param('courseSlug')
+      const quizId = parseInt(c.req.param('quizId'))
+      const attemptId = parseInt(c.req.param('attemptId'))
+
+      // Obtener curso
+      const course = await c.env.DB.prepare(`
+        SELECT id, title, slug FROM courses WHERE slug = ?
+      `).bind(courseSlug).first<any>()
+
+      if (!course) {
+        return c.render(<div><section className="section"><div className="container text-center"><h1>Curso no encontrado</h1></div></section></div>)
+      }
+
+      // Obtener intento
+      const attempt = await c.env.DB.prepare(`
+        SELECT * FROM quiz_attempts
+        WHERE id = ? AND user_id = ? AND quiz_id = ?
+      `).bind(attemptId, user.id, quizId).first<any>()
+
+      if (!attempt) {
+        return c.render(<div><section className="section"><div className="container text-center"><h1>Resultado no encontrado</h1></div></section></div>)
+      }
+
+      // Obtener quiz
+      const quiz = await c.env.DB.prepare(`
+        SELECT * FROM quizzes WHERE id = ?
+      `).bind(quizId).first<any>()
+
+      // Obtener respuestas detalladas
+      const answers = await c.env.DB.prepare(`
+        SELECT
+          qa.*,
+          qq.question_text,
+          qq.question_type,
+          qq.explanation,
+          qq.points
+        FROM quiz_answers qa
+        JOIN quiz_questions qq ON qa.question_id = qq.id
+        WHERE qa.attempt_id = ?
+        ORDER BY qq.order_index ASC
+      `).bind(attemptId).all<any>()
+
+      // Obtener opciones para cada pregunta
+      const detailedAnswers = await Promise.all(
+        (answers.results || []).map(async (answer: any) => {
+          const options = await c.env.DB.prepare(`
+            SELECT * FROM quiz_options WHERE question_id = ? ORDER BY order_index
+          `).bind(answer.question_id).all<any>()
+
+          const selectedIds = JSON.parse(answer.selected_options)
+
+          return {
+            ...answer,
+            options: options.results || [],
+            selectedIds
+          }
+        })
+      )
+
+      return c.render(
+        <div>
+          <style dangerouslySetInnerHTML={{__html: `
+            .result-container {
+              max-width: 900px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .result-header {
+              background: white;
+              border-radius: 12px;
+              padding: 40px;
+              margin-bottom: 30px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+              text-align: center;
+            }
+            .score-circle {
+              width: 150px;
+              height: 150px;
+              border-radius: 50%;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              margin: 0 auto 20px;
+              font-size: 2.5rem;
+              font-weight: 700;
+              position: relative;
+            }
+            .score-circle.passed {
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+              color: white;
+            }
+            .score-circle.failed {
+              background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+              color: white;
+            }
+            .result-stats {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+              gap: 20px;
+              margin-top: 30px;
+            }
+            .stat-card {
+              background: #f8fafc;
+              padding: 20px;
+              border-radius: 8px;
+              text-align: center;
+            }
+            .answer-review {
+              background: white;
+              border-radius: 12px;
+              padding: 25px;
+              margin-bottom: 20px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .answer-review.correct {
+              border-left: 4px solid #10b981;
+            }
+            .answer-review.incorrect {
+              border-left: 4px solid #ef4444;
+            }
+            .option-review {
+              padding: 12px 15px;
+              margin: 8px 0;
+              border-radius: 6px;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+            }
+            .option-review.correct {
+              background: #dcfce7;
+              border: 2px solid #10b981;
+            }
+            .option-review.incorrect {
+              background: #fee2e2;
+              border: 2px solid #ef4444;
+            }
+            .option-review.not-selected {
+              background: #f8fafc;
+              border: 2px solid #e2e8f0;
+            }
+            .explanation-box {
+              background: #fef3c7;
+              border-left: 4px solid #f59e0b;
+              padding: 15px;
+              margin-top: 15px;
+              border-radius: 4px;
+            }
+          `}} />
+
+          <div className="result-container">
+            <div style="display: flex; align-items: center; gap: 10px; color: #64748b; margin-bottom: 20px;">
+              <a href="/mi-aprendizaje" style="color: #8b5cf6; text-decoration: none;">Mis Cursos</a>
+              <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
+              <a href={`/cursos/${courseSlug}`} style="color: #8b5cf6; text-decoration: none;">{course.title}</a>
+              <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
+              <span>Resultado de Evaluación</span>
+            </div>
+
+            <div className="result-header">
+              <div className={`score-circle ${attempt.passed ? 'passed' : 'failed'}`}>
+                <div>{attempt.score.toFixed(0)}%</div>
+                <div style="font-size: 0.9rem; font-weight: 400;">{attempt.passed ? 'Aprobado' : 'No Aprobado'}</div>
+              </div>
+
+              <h1 style="font-size: 2rem; color: #1e293b; margin-bottom: 10px;">{quiz.title}</h1>
+
+              {attempt.passed ? (
+                <p style="color: #10b981; font-size: 1.2rem; font-weight: 600;">
+                  <i className="fas fa-check-circle"></i> ¡Felicitaciones! Has aprobado la evaluación
+                </p>
+              ) : (
+                <p style="color: #ef4444; font-size: 1.2rem; font-weight: 600;">
+                  <i className="fas fa-times-circle"></i> No alcanzaste el puntaje mínimo de {quiz.passing_score}%
+                </p>
+              )}
+
+              <div className="result-stats">
+                <div className="stat-card">
+                  <i className="fas fa-star fa-2x" style="color: #f59e0b; margin-bottom: 10px;"></i>
+                  <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">{attempt.points_earned}/{attempt.total_points}</div>
+                  <div style="color: #64748b; font-size: 0.9rem;">Puntos Obtenidos</div>
+                </div>
+                <div className="stat-card">
+                  <i className="fas fa-clock fa-2x" style="color: #8b5cf6; margin-bottom: 10px;"></i>
+                  <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">{Math.floor(attempt.time_taken / 60)}:{(attempt.time_taken % 60).toString().padStart(2, '0')}</div>
+                  <div style="color: #64748b; font-size: 0.9rem;">Tiempo Tomado</div>
+                </div>
+                <div className="stat-card">
+                  <i className="fas fa-check-circle fa-2x" style="color: #10b981; margin-bottom: 10px;"></i>
+                  <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">{detailedAnswers.filter((a: any) => a.is_correct).length}/{detailedAnswers.length}</div>
+                  <div style="color: #64748b; font-size: 0.9rem;">Respuestas Correctas</div>
+                </div>
+              </div>
+
+              <div style="margin-top: 30px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <a href={`/cursos/${courseSlug}`} className="btn btn-primary">
+                  <i className="fas fa-arrow-left"></i> Volver al Curso
+                </a>
+                {!attempt.passed && quiz.max_attempts && attempt.attempt_count < quiz.max_attempts && (
+                  <a href={`/cursos/${courseSlug}/quiz/${quizId}`} className="btn btn-secondary">
+                    <i className="fas fa-redo"></i> Intentar de Nuevo
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {quiz.show_correct_answers && (
+              <div>
+                <h2 style="font-size: 1.5rem; color: #1e293b; margin-bottom: 20px;">
+                  <i className="fas fa-list-alt"></i> Revisión de Respuestas
+                </h2>
+
+                {detailedAnswers.map((answer: any, idx: number) => (
+                  <div className={`answer-review ${answer.is_correct ? 'correct' : 'incorrect'}`} key={answer.question_id}>
+                    <div style="display: flex; align-items: start; justify-content: space-between; margin-bottom: 15px;">
+                      <div style="display: flex; gap: 15px; align-items: start; flex: 1;">
+                        <div style={`font-size: 1.5rem; ${answer.is_correct ? 'color: #10b981' : 'color: #ef4444'}`}>
+                          {answer.is_correct ? <i className="fas fa-check-circle"></i> : <i className="fas fa-times-circle"></i>}
+                        </div>
+                        <div style="flex: 1;">
+                          <div style="font-weight: 600; color: #64748b; margin-bottom: 5px;">Pregunta {idx + 1}</div>
+                          <h3 style="font-size: 1.2rem; color: #1e293b; margin-bottom: 15px;">{answer.question_text}</h3>
+
+                          {answer.options.map((option: any) => {
+                            const isSelected = answer.selectedIds.includes(option.id)
+                            const isCorrect = option.is_correct
+
+                            let className = 'option-review'
+                            if (isCorrect) {
+                              className += ' correct'
+                            } else if (isSelected) {
+                              className += ' incorrect'
+                            } else {
+                              className += ' not-selected'
+                            }
+
+                            return (
+                              <div className={className} key={option.id}>
+                                {isCorrect && <i className="fas fa-check" style="color: #10b981;"></i>}
+                                {!isCorrect && isSelected && <i className="fas fa-times" style="color: #ef4444;"></i>}
+                                {!isCorrect && !isSelected && <i className="far fa-circle" style="color: #94a3b8;"></i>}
+                                <span>{option.option_text}</span>
+                              </div>
+                            )
+                          })}
+
+                          {answer.explanation && (
+                            <div className="explanation-box">
+                              <strong style="color: #d97706;"><i className="fas fa-lightbulb"></i> Explicación:</strong>
+                              <p style="margin: 5px 0 0 0; color: #78350f;">{answer.explanation}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-
-                    <div style="padding: 20px;">
-                      <h3 style="font-size: 1.2rem; color: #1e293b; margin-bottom: 10px; font-weight: 700;">
-                        {course.title}
-                      </h3>
-                      <p style="color: #64748b; font-size: 0.95rem; margin-bottom: 20px;">
-                        {course.subtitle}
-                      </p>
-
-                      {/* Progress Bar */}
-                      <div style="margin-bottom: 20px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                          <span style="font-size: 0.9rem; color: #64748b;">Progreso</span>
-                          <span style="font-size: 0.9rem; font-weight: 600; color: #8b5cf6;">{course.progress}%</span>
+                      <div style="text-align: right;">
+                        <div style={`font-weight: 700; font-size: 1.1rem; ${answer.is_correct ? 'color: #10b981' : 'color: #ef4444'}`}>
+                          {answer.points_earned}/{answer.points} pts
                         </div>
-                        <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 10px; overflow: hidden;">
-                          <div
-                            style={`width: ${course.progress}%; height: 100%; background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%); transition: width 0.3s;`}
-                          ></div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.85rem; color: #94a3b8;">
-                          <span>{course.completed_lessons} / {course.total_lessons} lecciones</span>
-                          <span>{course.duration_weeks} semanas</span>
-                        </div>
-                      </div>
-
-                      <a href={course.next_lesson_id ? `/cursos/${course.slug}/leccion/${course.next_lesson_id}` : `/cursos/${course.slug}`} className="btn btn-primary btn-block">
-                        <i className="fas fa-play"></i> {course.progress > 0 ? 'Continuar Aprendiendo' : 'Comenzar Curso'}
-                      </a>
-
-                      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;">
-                        <a href={`/cursos/${course.slug}`} className="btn btn-sm btn-outline" style="font-size: 0.85rem;">
-                          <i className="fas fa-list"></i> Ver Temario
-                        </a>
-                        {course.certificate_id && (
-                          <a href={`/certificado/${course.certificate_id}`} className="btn btn-sm btn-outline" style="font-size: 0.85rem; background: #10b981; color: white; border-color: #10b981;">
-                            <i className="fas fa-certificate"></i> Certificado
-                          </a>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -189,2312 +2059,444 @@ app.get('/mi-aprendizaje', async (c) => {
               </div>
             )}
           </div>
-        </section>
-
-        {/* Stats Section */}
-        {coursesWithProgress.length > 0 && (
-          <section className="section bg-light">
-            <div className="container">
-              <h2 style="text-align: center; margin-bottom: 40px;">Tu Progreso General</h2>
-              <div className="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 30px; max-width: 900px; margin: 0 auto;">
-                <div className="stat-card" style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                  <i className="fas fa-book fa-3x" style="color: #8b5cf6; margin-bottom: 15px;"></i>
-                  <h3 style="font-size: 2.5rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;">
-                    {coursesWithProgress.length}
-                  </h3>
-                  <p style="color: #64748b;">Curso{coursesWithProgress.length > 1 ? 's' : ''} Activo{coursesWithProgress.length > 1 ? 's' : ''}</p>
-                </div>
-
-                <div className="stat-card" style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                  <i className="fas fa-tasks fa-3x" style="color: #10b981; margin-bottom: 15px;"></i>
-                  <h3 style="font-size: 2.5rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;">
-                    {coursesWithProgress.reduce((sum, c) => sum + c.completed_lessons, 0)}
-                  </h3>
-                  <p style="color: #64748b;">Lecciones Completadas</p>
-                </div>
-
-                <div className="stat-card" style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                  <i className="fas fa-certificate fa-3x" style="color: #f59e0b; margin-bottom: 15px;"></i>
-                  <h3 style="font-size: 2.5rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;">
-                    {coursesWithProgress.filter(c => c.completed).length}
-                  </h3>
-                  <p style="color: #64748b;">Curso{coursesWithProgress.filter(c => c.completed).length !== 1 ? 's' : ''} Completado{coursesWithProgress.filter(c => c.completed).length !== 1 ? 's' : ''}</p>
-                </div>
-
-                <div className="stat-card" style="text-align: center; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                  <i className="fas fa-chart-line fa-3x" style="color: #ec4899; margin-bottom: 15px;"></i>
-                  <h3 style="font-size: 2.5rem; font-weight: 700; color: #1e293b; margin-bottom: 5px;">
-                    {Math.round(coursesWithProgress.reduce((sum, c) => sum + c.progress, 0) / coursesWithProgress.length)}%
-                  </h3>
-                  <p style="color: #64748b;">Progreso Promedio</p>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        <script dangerouslySetInnerHTML={{__html: `
-          async function logout() {
-            if (!confirm('¿Estás seguro que deseas cerrar sesión?')) return;
-
-            try {
-              const response = await fetch('/api/logout', { method: 'POST' });
-              if (response.ok) {
-                window.location.href = '/';
-              }
-            } catch (error) {
-              console.error('Error al cerrar sesión:', error);
-              alert('Error al cerrar sesión. Por favor, intenta de nuevo.');
-            }
-          }
-        `}} />
-      </div>
-    )
-  } catch (error) {
-    console.error('Error al cargar dashboard:', error)
-    return c.render(
-      <div>
-        <section className="section">
-          <div className="container text-center">
-            <h1>Error al cargar tu aprendizaje</h1>
-            <p>Por favor, intenta de nuevo más tarde.</p>
-            <a href="/" className="btn btn-primary">Volver al inicio</a>
-          </div>
-        </section>
-      </div>
-    )
-  }
-})
-
-// ===== GESTIÓN DE LECCIONES =====
-
-// Página: Ver lección individual
-app.get('/cursos/:courseSlug/leccion/:lessonId', async (c) => {
-  try {
-    const { getCurrentUser, userHasAccess } = await import('../auth-utils')
-    const user = await getCurrentUser(c)
-
-    if (!user) {
-      return c.redirect('/login')
-    }
-
-    const courseSlug = c.req.param('courseSlug')
-    const lessonId = parseInt(c.req.param('lessonId'))
-
-    // Obtener información del curso
-    const course = await c.env.DB.prepare(`
-      SELECT id, title, slug FROM courses WHERE slug = ? AND published = 1
-    `).bind(courseSlug).first<any>()
-
-    if (!course) {
-      return c.render(
-        <div>
-          <section className="section">
-            <div className="container text-center">
-              <h1>Curso no encontrado</h1>
-              <a href="/cursos" className="btn btn-primary">Ver Cursos</a>
-            </div>
-          </section>
         </div>
       )
-    }
-
-    // Verificar acceso al curso
-    const hasAccess = await userHasAccess(c.env.DB, user.id, course.id)
-
-    if (!hasAccess) {
+    } catch (error) {
+      console.error('Error al cargar resultado:', error)
       return c.render(
         <div>
           <section className="section">
             <div className="container text-center">
-              <i className="fas fa-lock fa-3x" style="color: #f59e0b; margin-bottom: 20px;"></i>
-              <h1>Acceso Restringido</h1>
-              <p className="lead">Necesitas inscribirte en este curso para ver esta lección.</p>
-              <a href={`/cursos/${courseSlug}`} className="btn btn-primary">Ver Curso</a>
-            </div>
-          </section>
-        </div>
-      )
-    }
-
-    // Obtener lección
-    const lesson = await c.env.DB.prepare(`
-      SELECT * FROM lessons WHERE id = ? AND course_id = ? AND published = 1
-    `).bind(lessonId, course.id).first<any>()
-
-    if (!lesson) {
-      return c.render(
-        <div>
-          <section className="section">
-            <div className="container text-center">
-              <h1>Lección no encontrada</h1>
+              <h1>Error al cargar el resultado</h1>
+              <p>Por favor, intenta de nuevo más tarde.</p>
               <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
             </div>
           </section>
         </div>
       )
     }
+  })
 
-    // Obtener progreso del estudiante
-    const progress = await c.env.DB.prepare(`
-      SELECT * FROM student_progress
-      WHERE user_id = ? AND lesson_id = ? AND course_id = ?
-    `).bind(user.id, lessonId, course.id).first<any>()
+  // ===== RUTAS DE PAGOS Y CHECKOUT =====
 
-    // Obtener todas las lecciones del curso para navegación
-    const allLessons = await c.env.DB.prepare(`
-      SELECT id, module_number, lesson_number, title, video_duration, is_preview
-      FROM lessons
-      WHERE course_id = ? AND published = 1
-      ORDER BY order_index ASC
-    `).bind(course.id).all<any>()
+  // Página: Checkout
+  studentRoutes.get('/checkout/:courseId', async (c) => {
+    try {
+      const courseId = parseInt(c.req.param('courseId'))
 
-    // Obtener lecciones completadas
-    const completedLessons = await c.env.DB.prepare(`
-      SELECT lesson_id FROM student_progress
-      WHERE user_id = ? AND course_id = ? AND completed = 1
-    `).bind(user.id, course.id).all<any>()
+      // Verificar autenticación
+      const { getCurrentUser } = await import('../auth-utils')
+      const user = await getCurrentUser(c)
 
-    const completedIds = new Set((completedLessons.results || []).map((p: any) => p.lesson_id))
-
-    // Agrupar lecciones por módulo
-    const moduleMap = new Map()
-    for (const l of (allLessons.results || [])) {
-      if (!moduleMap.has(l.module_number)) {
-        moduleMap.set(l.module_number, [])
+      if (!user) {
+        return c.redirect(`/login?redirect=/checkout/${courseId}`)
       }
-      moduleMap.get(l.module_number).push(l)
-    }
 
-    // Encontrar lección anterior y siguiente
-    const currentIndex = (allLessons.results || []).findIndex((l: any) => l.id === lessonId)
-    const prevLesson = currentIndex > 0 ? (allLessons.results || [])[currentIndex - 1] : null
-    const nextLesson = currentIndex < (allLessons.results || []).length - 1 ? (allLessons.results || [])[currentIndex + 1] : null
+      // Obtener información del curso
+      const course = await c.env.DB.prepare(`
+        SELECT id, title, subtitle, price, currency, featured_image, duration_weeks, level
+        FROM courses
+        WHERE id = ? AND published = 1
+      `).bind(courseId).first<any>()
 
-    // Obtener recursos de la lección
-    const resources = await c.env.DB.prepare(`
-      SELECT * FROM lesson_resources WHERE lesson_id = ? ORDER BY created_at ASC
-    `).bind(lessonId).all<any>()
+      if (!course) {
+        return c.redirect('/cursos')
+      }
 
-    return c.render(
-      <div>
-        <style dangerouslySetInnerHTML={{__html: `
-          .lesson-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-          }
-          .lesson-layout {
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: 30px;
-            margin-top: 20px;
-          }
-          .lesson-main {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          }
-          .video-container {
-            position: relative;
-            width: 100%;
-            padding-top: 56.25%;
-            background: #000;
-          }
-          .video-container iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-          }
-          .lesson-content {
-            padding: 30px;
-          }
-          .lesson-sidebar {
-            position: sticky;
-            top: 20px;
-            height: fit-content;
-          }
-          .sidebar-section {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          }
-          .lesson-list {
-            max-height: 600px;
-            overflow-y: auto;
-          }
-          .lesson-item {
-            padding: 12px;
-            margin-bottom: 8px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 2px solid transparent;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-          }
-          .lesson-item:hover {
-            background: #f8fafc;
-          }
-          .lesson-item.active {
-            background: #ede9fe;
-            border-color: #8b5cf6;
-          }
-          .lesson-item.completed {
-            background: #dcfce7;
-          }
-          .lesson-checkbox {
-            width: 20px;
-            height: 20px;
-            border: 2px solid #cbd5e1;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-          }
-          .lesson-checkbox.checked {
-            background: #10b981;
-            border-color: #10b981;
-            color: white;
-          }
-          .module-header {
-            font-weight: 700;
-            color: #1e293b;
-            margin: 20px 0 10px 0;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #e2e8f0;
-          }
-          .notes-area {
-            width: 100%;
-            min-height: 120px;
-            padding: 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-family: inherit;
-            resize: vertical;
-          }
-          .notes-area:focus {
-            outline: none;
-            border-color: #8b5cf6;
-          }
-          .resource-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px;
-            background: #f8fafc;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            transition: all 0.2s;
-          }
-          .resource-item:hover {
-            background: #f1f5f9;
-          }
-          .resource-icon {
-            width: 40px;
-            height: 40px;
-            background: #8b5cf6;
-            color: white;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-          }
-          @media (max-width: 968px) {
-            .lesson-layout {
-              grid-template-columns: 1fr;
-            }
-            .lesson-sidebar {
-              position: static;
-            }
-          }
-        `}} />
+      // Verificar si ya está inscrito
+      const enrollment = await c.env.DB.prepare(`
+        SELECT id FROM paid_enrollments
+        WHERE user_id = ? AND course_id = ? AND payment_status = 'completed'
+      `).bind(user.id, courseId).first<any>()
 
-        <div className="lesson-container">
-          {/* Breadcrumb */}
-          <div style="display: flex; align-items: center; gap: 10px; color: #64748b; margin-bottom: 20px;">
-            <a href="/mi-aprendizaje" style="color: #8b5cf6; text-decoration: none;">Mis Cursos</a>
-            <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
-            <a href={`/cursos/${courseSlug}`} style="color: #8b5cf6; text-decoration: none;">{course.title}</a>
-            <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
-            <span>Módulo {lesson.module_number}, Lección {lesson.lesson_number}</span>
-          </div>
+      if (enrollment) {
+        return c.redirect('/mi-aprendizaje')
+      }
 
-          <div className="lesson-layout">
-            {/* Main Content */}
-            <div className="lesson-main">
-              {/* Video */}
-              {lesson.video_url && (
-                <div className="video-container">
-                  {progress?.last_position && progress.last_position > 10 && !progress.completed && (
-                    <div style="position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(139, 92, 246, 0.95); color: white; padding: 8px 15px; border-radius: 20px; font-size: 13px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;">
-                      <i className="fas fa-play-circle"></i>
-                      Continuar desde {Math.floor(progress.last_position / 60)}:{(progress.last_position % 60).toString().padStart(2, '0')}
-                    </div>
-                  )}
-                  <iframe
-                    src={lesson.video_url}
-                    title={lesson.title}
-                    frameborder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen
-                  ></iframe>
-                </div>
-              )}
-
-              {/* Lesson Content */}
-              <div className="lesson-content">
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
-                  <div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                      <span className="badge" style="background: #8b5cf6; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px;">
-                        Módulo {lesson.module_number}
-                      </span>
-                      <span style="color: #64748b; font-size: 14px;">
-                        Lección {lesson.lesson_number}
-                      </span>
-                    </div>
-                    <h1 style="font-size: 2rem; color: #1e293b; margin-bottom: 15px;">{lesson.title}</h1>
-                    {lesson.description && (
-                      <p style="color: #64748b; font-size: 1.1rem; line-height: 1.6;">{lesson.description}</p>
-                    )}
-                  </div>
-                  <button
-                    id="completeBtn"
-                    onclick="toggleComplete()"
-                    className="btn btn-success"
-                    style={`white-space: nowrap; ${progress?.completed ? 'background: #10b981;' : 'background: #64748b;'}`}
-                  >
-                    <i className={progress?.completed ? 'fas fa-check-circle' : 'far fa-circle'}></i>
-                    {progress?.completed ? 'Completada' : 'Marcar Completa'}
-                  </button>
-                </div>
-
-                {/* Navigation Buttons */}
-                <div style="display: flex; gap: 10px; margin-bottom: 30px; padding-bottom: 30px; border-bottom: 2px solid #e2e8f0;">
-                  {prevLesson && (
-                    <a href={`/cursos/${courseSlug}/leccion/${prevLesson.id}`} className="btn btn-secondary">
-                      <i className="fas fa-arrow-left"></i> Anterior
-                    </a>
-                  )}
-                  {nextLesson && (
-                    <a href={`/cursos/${courseSlug}/leccion/${nextLesson.id}`} className="btn btn-primary" style="margin-left: auto;">
-                      Siguiente <i className="fas fa-arrow-right"></i>
-                    </a>
-                  )}
-                </div>
-
-                {/* Lesson Content */}
-                {lesson.content && (
-                  <div style="margin-bottom: 40px;">
-                    <h2 style="font-size: 1.5rem; color: #1e293b; margin-bottom: 20px;">Contenido de la Lección</h2>
-                    <div style="line-height: 1.8; color: #475569;" dangerouslySetInnerHTML={{__html: lesson.content}} />
-                  </div>
-                )}
-
-                {/* Resources */}
-                {resources.results && resources.results.length > 0 && (
-                  <div style="margin-bottom: 40px;">
-                    <h2 style="font-size: 1.5rem; color: #1e293b; margin-bottom: 20px;">
-                      <i className="fas fa-download"></i> Recursos Descargables
-                    </h2>
-                    {resources.results.map((resource: any) => (
-                      <a href={resource.file_url} target="_blank" rel="noopener noreferrer" className="resource-item" style="text-decoration: none; color: inherit;">
-                        <div className="resource-icon">
-                          <i className={`fas fa-file-${resource.file_type === 'pdf' ? 'pdf' : resource.file_type === 'video' ? 'video' : 'alt'}`}></i>
-                        </div>
-                        <div style="flex: 1;">
-                          <h4 style="margin: 0 0 5px 0; color: #1e293b;">{resource.title}</h4>
-                          {resource.description && (
-                            <p style="margin: 0; color: #64748b; font-size: 14px;">{resource.description}</p>
-                          )}
-                          <div style="display: flex; gap: 15px; margin-top: 5px; font-size: 12px; color: #94a3b8;">
-                            <span><i className="fas fa-file"></i> {resource.file_type.toUpperCase()}</span>
-                            {resource.file_size && (
-                              <span><i className="fas fa-hdd"></i> {(resource.file_size / 1024).toFixed(0)} KB</span>
-                            )}
-                            <span><i className="fas fa-download"></i> {resource.downloads_count || 0} descargas</span>
-                          </div>
-                        </div>
-                        <i className="fas fa-external-link-alt" style="color: #8b5cf6;"></i>
-                      </a>
-                    ))}
-                  </div>
-                )}
-
-                {/* Notes Section */}
-                <div>
-                  <h2 style="font-size: 1.5rem; color: #1e293b; margin-bottom: 20px;">
-                    <i className="fas fa-sticky-note"></i> Mis Notas
-                  </h2>
-                  <textarea
-                    id="notesArea"
-                    className="notes-area"
-                    placeholder="Escribe tus notas sobre esta lección..."
-                  >{progress?.notes || ''}</textarea>
-                  <button onclick="saveNotes()" className="btn btn-primary" style="margin-top: 15px;">
-                    <i className="fas fa-save"></i> Guardar Notas
-                  </button>
-                  <span id="saveStatus" style="margin-left: 15px; color: #10b981; display: none;">
-                    <i className="fas fa-check"></i> Notas guardadas
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Sidebar */}
-            <div className="lesson-sidebar">
-              {/* Progress Section */}
-              <div className="sidebar-section">
-                <h3 style="margin: 0 0 15px 0; color: #1e293b; font-size: 1.1rem;">
-                  <i className="fas fa-chart-line" style="color: #8b5cf6;"></i> Tu Progreso
-                </h3>
-                <div style="margin-bottom: 15px;">
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span style="color: #64748b; font-size: 14px;">Lecciones completadas</span>
-                    <span style="font-weight: 700; color: #1e293b;">{completedIds.size} / {allLessons.results?.length || 0}</span>
-                  </div>
-                  <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-                    <div style={`width: ${((completedIds.size / (allLessons.results?.length || 1)) * 100).toFixed(0)}%; height: 100%; background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%); transition: width 0.3s;`}></div>
-                  </div>
-                  <p style="text-align: center; margin-top: 10px; font-size: 24px; font-weight: 700; color: #8b5cf6;">
-                    {((completedIds.size / (allLessons.results?.length || 1)) * 100).toFixed(0)}%
-                  </p>
-                </div>
-              </div>
-
-              {/* Course Content */}
-              <div className="sidebar-section">
-                <h3 style="margin: 0 0 15px 0; color: #1e293b; font-size: 1.1rem;">
-                  <i className="fas fa-list"></i> Contenido del Curso
-                </h3>
-                <div className="lesson-list">
-                  {Array.from(moduleMap.entries()).map(([moduleNum, lessons]: [number, any[]]) => (
-                    <div key={moduleNum}>
-                      <div className="module-header">
-                        Módulo {moduleNum}
-                      </div>
-                      {lessons.map((l: any) => (
-                        <a
-                          href={`/cursos/${courseSlug}/leccion/${l.id}`}
-                          className={`lesson-item ${l.id === lessonId ? 'active' : ''} ${completedIds.has(l.id) ? 'completed' : ''}`}
-                          style="text-decoration: none; color: inherit;"
-                          key={l.id}
-                        >
-                          <div className={`lesson-checkbox ${completedIds.has(l.id) ? 'checked' : ''}`}>
-                            {completedIds.has(l.id) && <i className="fas fa-check" style="font-size: 12px;"></i>}
-                          </div>
-                          <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: 500; color: #1e293b; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                              {l.lesson_number}. {l.title}
-                            </div>
-                            {l.video_duration && (
-                              <div style="font-size: 12px; color: #64748b;">
-                                <i className="fas fa-play-circle"></i> {Math.floor(l.video_duration / 60)}:{(l.video_duration % 60).toString().padStart(2, '0')} min
-                              </div>
-                            )}
-                          </div>
-                          {l.is_preview && (
-                            <span style="font-size: 11px; background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 10px;">
-                              Preview
-                            </span>
-                          )}
-                        </a>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <script dangerouslySetInnerHTML={{__html: `
-          let isCompleted = ${progress?.completed ? 'true' : 'false'};
-          const lessonId = ${lessonId};
-          const courseId = ${course.id};
-
-          async function toggleComplete() {
-            try {
-              const btn = document.getElementById('completeBtn');
-              btn.disabled = true;
-
-              const response = await fetch('/api/lessons/${lessonId}/complete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ completed: !isCompleted, courseId })
-              });
-
-              const data = await response.json();
-
-              if (data.success) {
-                isCompleted = !isCompleted;
-                btn.innerHTML = isCompleted
-                  ? '<i class="fas fa-check-circle"></i> Completada'
-                  : '<i class="far fa-circle"></i> Marcar Completa';
-                btn.style.background = isCompleted ? '#10b981' : '#64748b';
-
-                // Mostrar notificación de certificado
-                if (data.certificateGenerated && data.certificateId) {
-                  if (confirm('¡Felicitaciones! Has completado el curso al 100%. Tu certificado ha sido generado. ¿Deseas verlo ahora?')) {
-                    window.location.href = '/certificado/' + data.certificateId;
-                    return;
-                  }
-                }
-
-                // Reload page to update sidebar
-                setTimeout(() => window.location.reload(), 500);
-              } else {
-                alert('Error al actualizar el progreso');
-              }
-            } catch (error) {
-              console.error('Error:', error);
-              alert('Error al actualizar el progreso');
-            } finally {
-              document.getElementById('completeBtn').disabled = false;
-            }
-          }
-
-          async function saveNotes() {
-            try {
-              const notes = document.getElementById('notesArea').value;
-              const saveStatus = document.getElementById('saveStatus');
-
-              const response = await fetch('/api/lessons/${lessonId}/notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes, courseId })
-              });
-
-              const data = await response.json();
-
-              if (data.success) {
-                saveStatus.style.display = 'inline';
-                setTimeout(() => saveStatus.style.display = 'none', 3000);
-              } else {
-                alert('Error al guardar notas');
-              }
-            } catch (error) {
-              console.error('Error:', error);
-              alert('Error al guardar notas');
-            }
-          }
-
-          // Auto-save notes every 30 seconds
-          let notesTimeout;
-          document.getElementById('notesArea').addEventListener('input', () => {
-            clearTimeout(notesTimeout);
-            notesTimeout = setTimeout(saveNotes, 30000);
-          });
-
-          // ===== VIDEO PROGRESS TRACKING =====
-
-          const lastPosition = ${progress?.last_position || 0};
-          const videoDuration = ${lesson.video_duration || 0};
-          let videoProgressInterval;
-          let currentVideoTime = 0;
-          let currentVideoDuration = 0;
-          let videoReady = false;
-
-          // Function to save video progress
-          async function saveVideoProgress(position, duration) {
-            try {
-              await fetch('/api/lessons/${lessonId}/progress', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  position: Math.round(position),
-                  duration: Math.round(duration),
-                  courseId
-                })
-              });
-            } catch (error) {
-              console.error('Error saving video progress:', error);
-            }
-          }
-
-          // YouTube IFrame API
-          function initYouTubeTracking() {
-            const iframe = document.querySelector('iframe');
-            if (!iframe || !iframe.src.includes('youtube.com')) return;
-
-            // Load YouTube IFrame API
-            if (!window.YT) {
-              const tag = document.createElement('script');
-              tag.src = 'https://www.youtube.com/iframe_api';
-              const firstScriptTag = document.getElementsByTagName('script')[0];
-              firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-            }
-
-            // Initialize player when API is ready
-            window.onYouTubeIframeAPIReady = function() {
-              const player = new YT.Player(iframe, {
-                events: {
-                  'onReady': function(event) {
-                    videoReady = true;
-                    currentVideoDuration = event.target.getDuration();
-
-                    // Restore last position if exists
-                    if (lastPosition > 0 && lastPosition < currentVideoDuration - 5) {
-                      event.target.seekTo(lastPosition, true);
-                      console.log('Restored video position:', lastPosition);
-                    }
-
-                    // Start tracking every 10 seconds
-                    videoProgressInterval = setInterval(() => {
-                      try {
-                        const currentTime = event.target.getCurrentTime();
-                        const duration = event.target.getDuration();
-
-                        if (currentTime > 0 && duration > 0) {
-                          currentVideoTime = currentTime;
-                          currentVideoDuration = duration;
-                          saveVideoProgress(currentTime, duration);
-                        }
-                      } catch (err) {
-                        console.error('Error tracking YouTube progress:', err);
-                      }
-                    }, 10000);
-                  },
-                  'onStateChange': function(event) {
-                    // Save on pause or end
-                    if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
-                      try {
-                        const currentTime = event.target.getCurrentTime();
-                        const duration = event.target.getDuration();
-                        if (currentTime > 0 && duration > 0) {
-                          saveVideoProgress(currentTime, duration);
-                        }
-                      } catch (err) {
-                        console.error('Error saving on pause:', err);
-                      }
-                    }
-
-                    // Auto-complete when video ends
-                    if (event.data === YT.PlayerState.ENDED && !isCompleted) {
-                      setTimeout(toggleComplete, 1000);
-                    }
-                  }
-                }
-              });
-            };
-
-            // If API already loaded
-            if (window.YT && window.YT.Player) {
-              window.onYouTubeIframeAPIReady();
-            }
-          }
-
-          // Vimeo Player API
-          function initVimeoTracking() {
-            const iframe = document.querySelector('iframe');
-            if (!iframe || !iframe.src.includes('vimeo.com')) return;
-
-            // Load Vimeo Player API
-            if (!window.Vimeo) {
-              const script = document.createElement('script');
-              script.src = 'https://player.vimeo.com/api/player.js';
-              script.onload = setupVimeoPlayer;
-              document.head.appendChild(script);
-            } else {
-              setupVimeoPlayer();
-            }
-
-            function setupVimeoPlayer() {
-              const player = new Vimeo.Player(iframe);
-
-              player.ready().then(() => {
-                videoReady = true;
-
-                player.getDuration().then(duration => {
-                  currentVideoDuration = duration;
-
-                  // Restore last position
-                  if (lastPosition > 0 && lastPosition < duration - 5) {
-                    player.setCurrentTime(lastPosition).then(() => {
-                      console.log('Restored video position:', lastPosition);
-                    });
-                  }
-                });
-
-                // Track current time
-                player.on('timeupdate', data => {
-                  currentVideoTime = data.seconds;
-                  currentVideoDuration = data.duration;
-                });
-
-                // Start auto-save every 10 seconds
-                videoProgressInterval = setInterval(() => {
-                  if (currentVideoTime > 0 && currentVideoDuration > 0) {
-                    saveVideoProgress(currentVideoTime, currentVideoDuration);
-                  }
-                }, 10000);
-
-                // Save on pause
-                player.on('pause', () => {
-                  if (currentVideoTime > 0) {
-                    saveVideoProgress(currentVideoTime, currentVideoDuration);
-                  }
-                });
-
-                // Save and auto-complete on end
-                player.on('ended', () => {
-                  saveVideoProgress(currentVideoTime, currentVideoDuration);
-                  if (!isCompleted) {
-                    setTimeout(toggleComplete, 1000);
-                  }
-                });
-              });
-            }
-          }
-
-          // Generic HTML5 Video tracking (for self-hosted videos)
-          function initHTML5VideoTracking() {
-            const video = document.querySelector('video');
-            if (!video) return;
-
-            video.addEventListener('loadedmetadata', () => {
-              videoReady = true;
-              currentVideoDuration = video.duration;
-
-              // Restore position
-              if (lastPosition > 0 && lastPosition < video.duration - 5) {
-                video.currentTime = lastPosition;
-                console.log('Restored video position:', lastPosition);
-              }
-            });
-
-            // Track time updates
-            video.addEventListener('timeupdate', () => {
-              currentVideoTime = video.currentTime;
-              currentVideoDuration = video.duration;
-            });
-
-            // Auto-save every 10 seconds
-            videoProgressInterval = setInterval(() => {
-              if (video.currentTime > 0 && video.duration > 0) {
-                saveVideoProgress(video.currentTime, video.duration);
-              }
-            }, 10000);
-
-            // Save on pause
-            video.addEventListener('pause', () => {
-              if (video.currentTime > 0) {
-                saveVideoProgress(video.currentTime, video.duration);
-              }
-            });
-
-            // Save and auto-complete on end
-            video.addEventListener('ended', () => {
-              saveVideoProgress(video.currentTime, video.duration);
-              if (!isCompleted) {
-                setTimeout(toggleComplete, 1000);
-              }
-            });
-          }
-
-          // Initialize appropriate tracking
-          setTimeout(() => {
-            initYouTubeTracking();
-            initVimeoTracking();
-            initHTML5VideoTracking();
-          }, 1000);
-
-          // Save progress before leaving page
-          window.addEventListener('beforeunload', () => {
-            if (currentVideoTime > 0 && currentVideoDuration > 0) {
-              // Use sendBeacon for reliable saving on page unload
-              const data = JSON.stringify({
-                position: Math.round(currentVideoTime),
-                duration: Math.round(currentVideoDuration),
-                courseId
-              });
-              navigator.sendBeacon('/api/lessons/${lessonId}/progress', data);
-            }
-          });
-
-          // Clear interval on page unload
-          window.addEventListener('unload', () => {
-            if (videoProgressInterval) {
-              clearInterval(videoProgressInterval);
-            }
-          });
-        `}} />
-      </div>
-    )
-  } catch (error) {
-    console.error('Error al cargar lección:', error)
-    return c.render(
-      <div>
-        <section className="section">
-          <div className="container text-center">
-            <h1>Error al cargar la lección</h1>
-            <p>Por favor, intenta de nuevo más tarde.</p>
-            <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
-          </div>
-        </section>
-      </div>
-    )
-  }
-})
-
-// ===== SISTEMA DE CERTIFICADOS =====
-
-// Página: Ver Certificado
-app.get('/certificado/:certificateId', async (c) => {
-  try {
-    const { getCurrentUser } = await import('../auth-utils')
-    const user = await getCurrentUser(c)
-
-    if (!user) {
-      return c.redirect('/login')
-    }
-
-    const certificateId = parseInt(c.req.param('certificateId'))
-
-    // Obtener certificado con información del usuario y curso
-    const certificate = await c.env.DB.prepare(`
-      SELECT
-        c.*,
-        u.name as user_name,
-        u.email as user_email,
-        co.title as course_title,
-        co.subtitle as course_subtitle,
-        co.duration_weeks,
-        pe.enrolled_at,
-        pe.completion_date
-      FROM certificates c
-      JOIN users u ON c.user_id = u.id
-      JOIN courses co ON c.course_id = co.id
-      JOIN paid_enrollments pe ON c.enrollment_id = pe.id
-      WHERE c.id = ? AND c.user_id = ?
-    `).bind(certificateId, user.id).first<any>()
-
-    if (!certificate) {
       return c.render(
         <div>
-          <section className="section">
-            <div className="container text-center">
-              <h1>Certificado no encontrado</h1>
-              <p>No tienes acceso a este certificado o no existe.</p>
-              <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
+          <section className="hero hero-small">
+            <div className="container">
+              <h1>Checkout</h1>
+              <p className="lead">Completa tu inscripción al curso</p>
             </div>
           </section>
-        </div>
-      )
-    }
 
-    const issueDate = new Date(certificate.issue_date)
-    const completionDate = certificate.completion_date ? new Date(certificate.completion_date) : issueDate
-
-    return c.render(
-      <div>
-        <style dangerouslySetInnerHTML={{__html: `
-          @media print {
-            .no-print { display: none !important; }
-            .certificate-container { box-shadow: none; margin: 0; padding: 0; }
-            body { background: white; }
-          }
-          .certificate-container {
-            max-width: 1000px;
-            margin: 40px auto;
-            background: white;
-            padding: 60px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            border: 10px solid #8b5cf6;
-            border-radius: 8px;
-            position: relative;
-          }
-          .certificate-border {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            bottom: 20px;
-            border: 2px solid #d4b5ff;
-            pointer-events: none;
-          }
-          .certificate-header {
-            text-align: center;
-            margin-bottom: 40px;
-            position: relative;
-            z-index: 1;
-          }
-          .certificate-logo {
-            font-size: 4rem;
-            color: #8b5cf6;
-            margin-bottom: 20px;
-          }
-          .certificate-title {
-            font-size: 3rem;
-            font-weight: 900;
-            color: #1e293b;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 10px;
-          }
-          .certificate-subtitle {
-            font-size: 1.2rem;
-            color: #64748b;
-            font-weight: 300;
-          }
-          .certificate-body {
-            text-align: center;
-            margin: 50px 0;
-            position: relative;
-            z-index: 1;
-          }
-          .certificate-text {
-            font-size: 1.3rem;
-            color: #475569;
-            margin-bottom: 30px;
-            line-height: 1.8;
-          }
-          .recipient-name {
-            font-size: 3.5rem;
-            font-weight: 700;
-            color: #8b5cf6;
-            margin: 30px 0;
-            font-family: 'Georgia', serif;
-            border-bottom: 3px solid #8b5cf6;
-            display: inline-block;
-            padding-bottom: 10px;
-          }
-          .course-name {
-            font-size: 2rem;
-            font-weight: 600;
-            color: #1e293b;
-            margin: 30px 0;
-          }
-          .certificate-footer {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 60px;
-            padding-top: 40px;
-            border-top: 2px solid #e2e8f0;
-            position: relative;
-            z-index: 1;
-          }
-          .signature-block {
-            text-align: center;
-          }
-          .signature-line {
-            width: 250px;
-            border-bottom: 2px solid #1e293b;
-            margin: 20px auto 10px;
-          }
-          .signature-label {
-            font-weight: 600;
-            color: #1e293b;
-            font-size: 1rem;
-          }
-          .certificate-meta {
-            text-align: center;
-            margin-top: 40px;
-            color: #64748b;
-            font-size: 0.9rem;
-            position: relative;
-            z-index: 1;
-          }
-          .verification-code {
-            display: inline-block;
-            background: #f8fafc;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-family: monospace;
-            font-weight: 600;
-            color: #8b5cf6;
-            border: 2px solid #e2e8f0;
-            margin-top: 10px;
-          }
-          .action-buttons {
-            text-align: center;
-            margin: 30px 0;
-            padding: 20px;
-            background: #f8fafc;
-            border-radius: 8px;
-          }
-          .watermark {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 15rem;
-            color: #f8fafc;
-            opacity: 0.3;
-            font-weight: 900;
-            z-index: 0;
-            pointer-events: none;
-          }
-        `}} />
-
-        <div className="action-buttons no-print">
-          <button onclick="window.print()" className="btn btn-primary btn-lg">
-            <i className="fas fa-print"></i> Imprimir Certificado
-          </button>
-          <a href="/mi-aprendizaje" className="btn btn-secondary btn-lg" style="margin-left: 15px;">
-            <i className="fas fa-arrow-left"></i> Volver a Mis Cursos
-          </a>
-          <button onclick="downloadPDF()" className="btn btn-secondary btn-lg" style="margin-left: 15px;">
-            <i className="fas fa-download"></i> Descargar PDF
-          </button>
-        </div>
-
-        <div className="certificate-container">
-          <div className="certificate-border"></div>
-          <div className="watermark">★</div>
-
-          <div className="certificate-header">
-            <div className="certificate-logo">
-              <i className="fas fa-brain"></i>
-            </div>
-            <h1 className="certificate-title">Certificado de Finalización</h1>
-            <p className="certificate-subtitle">Más Allá del Miedo</p>
-          </div>
-
-          <div className="certificate-body">
-            <p className="certificate-text">
-              Por medio del presente se certifica que
-            </p>
-
-            <div className="recipient-name">{certificate.user_name}</div>
-
-            <p className="certificate-text">
-              ha completado satisfactoriamente el curso
-            </p>
-
-            <div className="course-name">{certificate.course_title}</div>
-
-            {certificate.course_subtitle && (
-              <p className="certificate-text" style="font-size: 1.1rem; color: #64748b;">
-                {certificate.course_subtitle}
-              </p>
-            )}
-
-            <p className="certificate-text" style="margin-top: 40px;">
-              Duración: {certificate.duration_weeks} semanas<br/>
-              Fecha de finalización: {completionDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
-
-          <div className="certificate-footer">
-            <div className="signature-block">
-              <div className="signature-line"></div>
-              <p className="signature-label">Ernesto Alvarez</p>
-              <p style="color: #64748b; font-size: 0.9rem;">Autor y Facilitador</p>
-            </div>
-
-            <div className="signature-block">
-              <div className="signature-line"></div>
-              <p className="signature-label">Más Allá del Miedo</p>
-              <p style="color: #64748b; font-size: 0.9rem;">Plataforma Educativa</p>
-            </div>
-          </div>
-
-          <div className="certificate-meta">
-            <p>Código de Verificación</p>
-            <div className="verification-code">{certificate.certificate_code}</div>
-            <p style="margin-top: 20px; font-size: 0.85rem;">
-              Verifica la autenticidad de este certificado en:<br/>
-              <strong>https://masalladelmiedo.com/verificar/{certificate.certificate_code}</strong>
-            </p>
-            <p style="margin-top: 20px; font-size: 0.8rem; color: #94a3b8;">
-              Emitido el {issueDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
-        </div>
-
-        <script dangerouslySetInnerHTML={{__html: `
-          function downloadPDF() {
-            // En producción, esto llamaría a una API para generar PDF
-            // Por ahora, simplemente imprime
-            alert('Usa el botón de imprimir y selecciona "Guardar como PDF" en tu navegador.');
-            window.print();
-          }
-        `}} />
-      </div>
-    )
-  } catch (error) {
-    console.error('Error al cargar certificado:', error)
-    return c.render(
-      <div>
-        <section className="section">
-          <div className="container text-center">
-            <h1>Error al cargar el certificado</h1>
-            <p>Por favor, intenta de nuevo más tarde.</p>
-            <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
-          </div>
-        </section>
-      </div>
-    )
-  }
-})
-
-// ===== SISTEMA DE QUIZZES =====
-
-// Página: Tomar Quiz
-app.get('/cursos/:courseSlug/quiz/:quizId', async (c) => {
-  try {
-    const { getCurrentUser, userHasAccess } = await import('../auth-utils')
-    const user = await getCurrentUser(c)
-
-    if (!user) {
-      return c.redirect('/login')
-    }
-
-    const courseSlug = c.req.param('courseSlug')
-    const quizId = parseInt(c.req.param('quizId'))
-
-    // Obtener información del curso
-    const course = await c.env.DB.prepare(`
-      SELECT id, title, slug FROM courses WHERE slug = ? AND published = 1
-    `).bind(courseSlug).first<any>()
-
-    if (!course) {
-      return c.render(
-        <div>
           <section className="section">
-            <div className="container text-center">
-              <h1>Curso no encontrado</h1>
-              <a href="/cursos" className="btn btn-primary">Ver Cursos</a>
-            </div>
-          </section>
-        </div>
-      )
-    }
+            <div className="container">
+              <div className="checkout-container" style="max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 40px;">
 
-    // Verificar acceso al curso
-    const hasAccess = await userHasAccess(c.env.DB, user.id, course.id)
+                {/* Columna izquierda: Métodos de pago */}
+                <div className="payment-methods">
+                  <h2 style="margin-bottom: 30px;">Método de Pago</h2>
 
-    if (!hasAccess) {
-      return c.render(
-        <div>
-          <section className="section">
-            <div className="container text-center">
-              <i className="fas fa-lock fa-3x" style="color: #f59e0b; margin-bottom: 20px;"></i>
-              <h1>Acceso Restringido</h1>
-              <p className="lead">Necesitas estar inscrito en este curso para tomar esta evaluación.</p>
-              <a href={`/cursos/${courseSlug}`} className="btn btn-primary">Ver Curso</a>
-            </div>
-          </section>
-        </div>
-      )
-    }
+                  <div id="checkout-message" className="auth-message" style="display: none; margin-bottom: 20px;"></div>
 
-    // Obtener información del quiz
-    const quiz = await c.env.DB.prepare(`
-      SELECT * FROM quizzes WHERE id = ? AND course_id = ? AND published = 1
-    `).bind(quizId, course.id).first<any>()
-
-    if (!quiz) {
-      return c.render(
-        <div>
-          <section className="section">
-            <div className="container text-center">
-              <h1>Evaluación no encontrada</h1>
-              <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
-            </div>
-          </section>
-        </div>
-      )
-    }
-
-    // Verificar intentos previos
-    const attempts = await c.env.DB.prepare(`
-      SELECT * FROM quiz_attempts
-      WHERE quiz_id = ? AND user_id = ?
-      ORDER BY started_at DESC
-    `).bind(quizId, user.id).all<any>()
-
-    const attemptCount = attempts.results?.length || 0
-    const lastAttempt = attempts.results?.[0]
-    const canRetake = !quiz.max_attempts || attemptCount < quiz.max_attempts
-
-    // Si ya completó y pasó, mostrar resultados
-    if (lastAttempt && lastAttempt.passed && !canRetake) {
-      return c.redirect(`/cursos/${courseSlug}/quiz/${quizId}/resultado/${lastAttempt.id}`)
-    }
-
-    // Obtener preguntas con opciones
-    const questions = await c.env.DB.prepare(`
-      SELECT * FROM quiz_questions
-      WHERE quiz_id = ?
-      ORDER BY ${quiz.randomize_questions ? 'RANDOM()' : 'order_index ASC'}
-    `).bind(quizId).all<any>()
-
-    const questionsWithOptions = await Promise.all(
-      (questions.results || []).map(async (q: any) => {
-        const options = await c.env.DB.prepare(`
-          SELECT id, option_text, order_index FROM quiz_options
-          WHERE question_id = ?
-          ORDER BY ${quiz.randomize_options ? 'RANDOM()' : 'order_index ASC'}
-        `).bind(q.id).all<any>()
-
-        return {
-          ...q,
-          options: options.results || []
-        }
-      })
-    )
-
-    const totalPoints = questionsWithOptions.reduce((sum, q: any) => sum + q.points, 0)
-
-    return c.render(
-      <div>
-        <style dangerouslySetInnerHTML={{__html: `
-          .quiz-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-          }
-          .quiz-header {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          }
-          .quiz-info {
-            display: flex;
-            gap: 30px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-          }
-          .quiz-info-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #64748b;
-          }
-          .question-card {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          }
-          .question-number {
-            background: #8b5cf6;
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            margin-bottom: 15px;
-          }
-          .option-item {
-            padding: 15px 20px;
-            margin: 10px 0;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-          }
-          .option-item:hover {
-            border-color: #8b5cf6;
-            background: #f5f3ff;
-          }
-          .option-item input[type="radio"],
-          .option-item input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-          }
-          .option-item.selected {
-            border-color: #8b5cf6;
-            background: #ede9fe;
-          }
-          .quiz-timer {
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            background: white;
-            padding: 15px 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            z-index: 100;
-          }
-          .timer-display {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #1e293b;
-          }
-          .timer-display.warning {
-            color: #f59e0b;
-          }
-          .timer-display.danger {
-            color: #ef4444;
-            animation: pulse 1s infinite;
-          }
-          @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-          }
-          @media (max-width: 768px) {
-            .quiz-timer {
-              position: static;
-              margin-bottom: 20px;
-            }
-          }
-        `}} />
-
-        <div className="quiz-container">
-          {/* Header */}
-          <div style="display: flex; align-items: center; gap: 10px; color: #64748b; margin-bottom: 20px;">
-            <a href="/mi-aprendizaje" style="color: #8b5cf6; text-decoration: none;">Mis Cursos</a>
-            <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
-            <a href={`/cursos/${courseSlug}`} style="color: #8b5cf6; text-decoration: none;">{course.title}</a>
-            <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
-            <span>Evaluación</span>
-          </div>
-
-          <div className="quiz-header">
-            <div style="display: flex; align-items: start; justify-content: space-between;">
-              <div>
-                <h1 style="font-size: 2rem; color: #1e293b; margin-bottom: 10px;">{quiz.title}</h1>
-                {quiz.description && (
-                  <p style="color: #64748b; font-size: 1.1rem; line-height: 1.6;">{quiz.description}</p>
-                )}
-              </div>
-              <div style="text-align: right;">
-                <div style="background: #ede9fe; color: #8b5cf6; padding: 8px 16px; border-radius: 20px; font-weight: 600; margin-bottom: 10px;">
-                  Intento {attemptCount + 1}/{quiz.max_attempts || '∞'}
-                </div>
-              </div>
-            </div>
-
-            <div className="quiz-info">
-              <div className="quiz-info-item">
-                <i className="fas fa-list-ol" style="color: #8b5cf6;"></i>
-                <span>{questionsWithOptions.length} preguntas</span>
-              </div>
-              <div className="quiz-info-item">
-                <i className="fas fa-star" style="color: #f59e0b;"></i>
-                <span>{totalPoints} puntos totales</span>
-              </div>
-              <div className="quiz-info-item">
-                <i className="fas fa-check-circle" style="color: #10b981;"></i>
-                <span>{quiz.passing_score}% para aprobar</span>
-              </div>
-              {quiz.time_limit && (
-                <div className="quiz-info-item">
-                  <i className="fas fa-clock" style="color: #ec4899;"></i>
-                  <span>{quiz.time_limit} minutos</span>
-                </div>
-              )}
-            </div>
-
-            {attemptCount > 0 && lastAttempt && (
-              <div style="margin-top: 20px; padding: 15px; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
-                <strong>Último intento:</strong> {lastAttempt.score.toFixed(0)}%
-                {lastAttempt.passed ?
-                  <span style="color: #10b981; margin-left: 10px;"><i className="fas fa-check-circle"></i> Aprobado</span> :
-                  <span style="color: #ef4444; margin-left: 10px;"><i className="fas fa-times-circle"></i> No aprobado</span>
-                }
-              </div>
-            )}
-          </div>
-
-          {/* Timer */}
-          {quiz.time_limit && (
-            <div className="quiz-timer">
-              <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 5px;">
-                <i className="fas fa-clock"></i> Tiempo restante
-              </div>
-              <div className="timer-display" id="timerDisplay">{quiz.time_limit}:00</div>
-            </div>
-          )}
-
-          {/* Form */}
-          <form id="quizForm">
-            {questionsWithOptions.map((question: any, idx: number) => (
-              <div className="question-card" key={question.id}>
-                <div className="question-number">{idx + 1}</div>
-                <h3 style="font-size: 1.3rem; color: #1e293b; margin-bottom: 20px; line-height: 1.6;">
-                  {question.question_text}
-                </h3>
-                <div className="options-list">
-                  {question.options.map((option: any) => (
-                    <label
-                      className="option-item"
-                      key={option.id}
-                      onclick="this.classList.toggle('selected')"
+                  {/* Selector de método de pago */}
+                  <div className="payment-selector" style="display: flex; gap: 15px; margin-bottom: 30px;">
+                    <button
+                      id="select-stripe"
+                      className="payment-method-btn active"
+                      onclick="selectPaymentMethod('stripe')"
+                      style="flex: 1; padding: 20px; border: 2px solid #8b5cf6; border-radius: 12px; background: white; cursor: pointer; transition: all 0.3s;"
                     >
-                      <input
-                        type={question.question_type === 'multiple_select' ? 'checkbox' : 'radio'}
-                        name={`question_${question.id}`}
-                        value={option.id}
-                        required={idx === 0}
+                      <i className="fab fa-cc-stripe fa-2x" style="color: #635bff; margin-bottom: 10px;"></i>
+                      <div style="font-weight: 600; color: #1e293b;">Tarjeta de Crédito/Débito</div>
+                      <div style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">Visa, Mastercard, Amex</div>
+                    </button>
+
+                    <button
+                      id="select-paypal"
+                      className="payment-method-btn"
+                      onclick="selectPaymentMethod('paypal')"
+                      style="flex: 1; padding: 20px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; transition: all 0.3s;"
+                    >
+                      <i className="fab fa-paypal fa-2x" style="color: #0070ba; margin-bottom: 10px;"></i>
+                      <div style="font-weight: 600; color: #1e293b;">PayPal</div>
+                      <div style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">Pago rápido y seguro</div>
+                    </button>
+                  </div>
+
+                  {/* Formulario de Stripe */}
+                  <div id="stripe-payment" style="display: block;">
+                    <div style="padding: 30px; background: #f8fafc; border-radius: 12px; margin-bottom: 20px;">
+                      <h3 style="margin-bottom: 20px; color: #1e293b;">Información de Tarjeta</h3>
+
+                      <form id="payment-form">
+                        <div className="form-group">
+                          <label>Nombre en la tarjeta</label>
+                          <input
+                            type="text"
+                            id="card-holder-name"
+                            className="form-control"
+                            placeholder="Juan Pérez"
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Detalles de la tarjeta</label>
+                          <div id="card-element" style="padding: 12px; background: white; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            {/* Stripe Elements se montará aquí */}
+                          </div>
+                          <div id="card-errors" role="alert" style="color: #dc2626; font-size: 0.875rem; margin-top: 8px;"></div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          id="submit-stripe"
+                          className="btn btn-primary btn-lg btn-block"
+                          style="margin-top: 20px;"
+                        >
+                          <i className="fas fa-lock"></i> Pagar ${course.price} {course.currency}
+                        </button>
+                      </form>
+
+                      <div style="margin-top: 20px; text-align: center; color: #64748b; font-size: 0.85rem;">
+                        <i className="fas fa-shield-alt"></i> Pago seguro encriptado por Stripe
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PayPal */}
+                  <div id="paypal-payment" style="display: none;">
+                    <div style="padding: 30px; background: #f8fafc; border-radius: 12px; margin-bottom: 20px;">
+                      <h3 style="margin-bottom: 20px; color: #1e293b;">Pagar con PayPal</h3>
+
+                      <div id="paypal-button-container" style="margin-bottom: 20px;"></div>
+
+                      <div style="text-align: center; color: #64748b; font-size: 0.85rem;">
+                        <i className="fas fa-shield-alt"></i> Serás redirigido a PayPal para completar el pago
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Columna derecha: Resumen del pedido */}
+                <div className="order-summary">
+                  <div style="padding: 30px; background: white; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); position: sticky; top: 100px;">
+                    <h3 style="margin-bottom: 20px; color: #1e293b;">Resumen del Pedido</h3>
+
+                    <div style="margin-bottom: 20px;">
+                      <img
+                        src={course.featured_image}
+                        alt={course.title}
+                        style="width: 100%; border-radius: 8px; margin-bottom: 15px;"
                       />
-                      <span style="flex: 1; font-size: 1.05rem;">{option.option_text}</span>
-                    </label>
-                  ))}
+                      <h4 style="color: #1e293b; margin-bottom: 10px; font-size: 1.1rem;">{course.title}</h4>
+                      <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 15px;">{course.subtitle}</p>
+
+                      <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+                        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; background: #f1f5f9; border-radius: 20px; font-size: 0.85rem; color: #64748b;">
+                          <i className="fas fa-clock"></i> {course.duration_weeks} semanas
+                        </span>
+                        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; background: #f1f5f9; border-radius: 20px; font-size: 0.85rem; color: #64748b;">
+                          <i className="fas fa-signal"></i> {course.level}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style="border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 20px 0; margin: 20px 0;">
+                      <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="color: #64748b;">Precio del curso:</span>
+                        <span style="font-weight: 600; color: #1e293b;">${course.price} {course.currency}</span>
+                      </div>
+                      <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="color: #64748b;">Descuento:</span>
+                        <span style="font-weight: 600; color: #10b981;">$0.00</span>
+                      </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                      <span style="font-size: 1.1rem; font-weight: 600; color: #1e293b;">Total:</span>
+                      <span style="font-size: 1.3rem; font-weight: 700; color: #8b5cf6;">${course.price} {course.currency}</span>
+                    </div>
+
+                    <div style="padding: 15px; background: #f0fdf4; border-radius: 8px; margin-bottom: 20px;">
+                      <div style="display: flex; align-items: center; gap: 10px; color: #16a34a; font-size: 0.9rem;">
+                        <i className="fas fa-check-circle"></i>
+                        <span style="font-weight: 600;">Acceso inmediato al curso</span>
+                      </div>
+                    </div>
+
+                    <div style="font-size: 0.85rem; color: #64748b;">
+                      <p style="margin-bottom: 10px;">✓ Acceso de por vida</p>
+                      <p style="margin-bottom: 10px;">✓ Certificado al completar</p>
+                      <p style="margin-bottom: 10px;">✓ Recursos descargables</p>
+                      <p style="margin-bottom: 0;">✓ Comunidad privada</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))}
-
-            <div style="background: white; border-radius: 12px; padding: 30px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-              <button type="submit" className="btn btn-primary btn-lg">
-                <i className="fas fa-check-circle"></i> Enviar Evaluación
-              </button>
-              <p style="color: #64748b; margin-top: 15px; font-size: 0.95rem;">
-                Revisa tus respuestas antes de enviar. No podrás cambiarlas después.
-              </p>
             </div>
-          </form>
-        </div>
+          </section>
 
-        <script dangerouslySetInnerHTML={{__html: `
-          const quizId = ${quizId};
-          const courseId = ${course.id};
-          const timeLimit = ${quiz.time_limit || 0};
-          let timeRemaining = timeLimit * 60; // segundos
-          let timerInterval;
-          let startTime = Date.now();
-
-          // Iniciar timer si hay límite de tiempo
-          if (timeLimit > 0) {
-            timerInterval = setInterval(() => {
-              timeRemaining--;
-
-              const minutes = Math.floor(timeRemaining / 60);
-              const seconds = timeRemaining % 60;
-              const display = minutes + ':' + seconds.toString().padStart(2, '0');
-
-              const timerEl = document.getElementById('timerDisplay');
-              timerEl.textContent = display;
-
-              // Cambiar colores según tiempo restante
-              timerEl.classList.remove('warning', 'danger');
-              if (timeRemaining <= 60) {
-                timerEl.classList.add('danger');
-              } else if (timeRemaining <= 180) {
-                timerEl.classList.add('warning');
-              }
-
-              // Auto-submit cuando se acaba el tiempo
-              if (timeRemaining <= 0) {
-                clearInterval(timerInterval);
-                alert('¡Tiempo agotado! La evaluación se enviará automáticamente.');
-                document.getElementById('quizForm').dispatchEvent(new Event('submit'));
-              }
-            }, 1000);
-          }
-
-          // Manejar envío del formulario
-          document.getElementById('quizForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            if (timerInterval) clearInterval(timerInterval);
-
-            if (!confirm('¿Estás seguro de enviar la evaluación? No podrás cambiar tus respuestas.')) {
-              if (timerInterval && timeRemaining > 0) {
-                timerInterval = setInterval(() => { /* reiniciar timer */ }, 1000);
-              }
-              return;
-            }
-
-            const formData = new FormData(e.target);
-            const answers = {};
-
-            // Recopilar respuestas
-            for (let [key, value] of formData.entries()) {
-              if (key.startsWith('question_')) {
-                const questionId = key.replace('question_', '');
-                if (!answers[questionId]) {
-                  answers[questionId] = [];
+          <script src="https://js.stripe.com/v3/"></script>
+          <script dangerouslySetInnerHTML={{__html: `
+            const stripe = Stripe('${c.env.STRIPE_PUBLISHABLE_KEY}');
+            const elements = stripe.elements();
+            const cardElement = elements.create('card', {
+              style: {
+                base: {
+                  fontSize: '16px',
+                  color: '#1e293b',
+                  '::placeholder': { color: '#94a3b8' }
                 }
-                answers[questionId].push(parseInt(value));
               }
-            }
+            });
+            cardElement.mount('#card-element');
 
-            const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-
-            try {
-              const submitBtn = e.target.querySelector('button[type="submit"]');
-              submitBtn.disabled = true;
-              submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-
-              const response = await fetch('/api/quiz/submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  quizId,
-                  courseId,
-                  answers,
-                  timeTaken
-                })
-              });
-
-              const data = await response.json();
-
-              if (data.success) {
-                window.location.href = '/cursos/${courseSlug}/quiz/' + quizId + '/resultado/' + data.attemptId;
+            // Manejo de errores de tarjeta
+            cardElement.on('change', (event) => {
+              const displayError = document.getElementById('card-errors');
+              if (event.error) {
+                displayError.textContent = event.error.message;
               } else {
-                alert('Error: ' + (data.error || 'No se pudo enviar la evaluación'));
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Enviar Evaluación';
+                displayError.textContent = '';
               }
-            } catch (error) {
-              console.error('Error:', error);
-              alert('Error al enviar la evaluación. Por favor, intenta de nuevo.');
-              const submitBtn = e.target.querySelector('button[type="submit"]');
-              submitBtn.disabled = false;
-              submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Enviar Evaluación';
+            });
+
+            // Selector de método de pago
+            function selectPaymentMethod(method) {
+              const stripBtn = document.getElementById('select-stripe');
+              const paypalBtn = document.getElementById('select-paypal');
+              const stripeDiv = document.getElementById('stripe-payment');
+              const paypalDiv = document.getElementById('paypal-payment');
+
+              if (method === 'stripe') {
+                stripBtn.classList.add('active');
+                stripBtn.style.borderColor = '#8b5cf6';
+                paypalBtn.classList.remove('active');
+                paypalBtn.style.borderColor = '#e2e8f0';
+                stripeDiv.style.display = 'block';
+                paypalDiv.style.display = 'none';
+              } else {
+                paypalBtn.classList.add('active');
+                paypalBtn.style.borderColor = '#8b5cf6';
+                stripBtn.classList.remove('active');
+                stripBtn.style.borderColor = '#e2e8f0';
+                paypalDiv.style.display = 'block';
+                stripeDiv.style.display = 'none';
+                loadPayPalButton();
+              }
             }
-          });
 
-          // Prevenir salida accidental
-          window.addEventListener('beforeunload', (e) => {
-            e.preventDefault();
-            e.returnValue = '';
-          });
-        `}} />
-      </div>
-    )
-  } catch (error) {
-    console.error('Error al cargar quiz:', error)
+            // Formulario de pago con Stripe
+            const form = document.getElementById('payment-form');
+            form.addEventListener('submit', async (e) => {
+              e.preventDefault();
+
+              const submitButton = document.getElementById('submit-stripe');
+              const messageDiv = document.getElementById('checkout-message');
+              const originalText = submitButton.innerHTML;
+
+              submitButton.disabled = true;
+              submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+              messageDiv.style.display = 'none';
+
+              try {
+                // Crear Payment Intent
+                const response = await fetch('/api/create-payment-intent', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    courseId: ${courseId},
+                    paymentMethod: 'stripe'
+                  })
+                });
+
+                const { clientSecret, error } = await response.json();
+
+                if (error) {
+                  throw new Error(error);
+                }
+
+                // Confirmar pago
+                const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+                  payment_method: {
+                    card: cardElement,
+                    billing_details: {
+                      name: document.getElementById('card-holder-name').value
+                    }
+                  }
+                });
+
+                if (stripeError) {
+                  throw new Error(stripeError.message);
+                }
+
+                // Verificar pago en el servidor
+                const verifyResponse = await fetch('/api/verify-payment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    paymentIntentId: paymentIntent.id,
+                    courseId: ${courseId}
+                  })
+                });
+
+                const verifyData = await verifyResponse.json();
+
+                if (verifyData.success) {
+                  window.location.href = '/pago-exitoso?courseId=${courseId}';
+                } else {
+                  throw new Error('Error al verificar el pago');
+                }
+
+              } catch (error) {
+                messageDiv.className = 'auth-message error';
+                messageDiv.textContent = error.message;
+                messageDiv.style.display = 'block';
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
+              }
+            });
+
+            // PayPal
+            function loadPayPalButton() {
+              if (window.paypalLoaded) return;
+
+              const script = document.createElement('script');
+              script.src = 'https://www.paypal.com/sdk/js?client-id=${c.env.PAYPAL_CLIENT_ID}&currency=${course.currency}';
+              script.onload = () => {
+                window.paypalLoaded = true;
+                paypal.Buttons({
+                  createOrder: async () => {
+                    const response = await fetch('/api/create-paypal-order', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ courseId: ${courseId} })
+                    });
+                    const data = await response.json();
+                    return data.orderId;
+                  },
+                  onApprove: async (data) => {
+                    const response = await fetch('/api/capture-paypal-order', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        orderId: data.orderID,
+                        courseId: ${courseId}
+                      })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                      window.location.href = '/pago-exitoso?courseId=${courseId}';
+                    }
+                  },
+                  onError: (err) => {
+                    const messageDiv = document.getElementById('checkout-message');
+                    messageDiv.className = 'auth-message error';
+                    messageDiv.textContent = 'Error al procesar el pago con PayPal';
+                    messageDiv.style.display = 'block';
+                  }
+                }).render('#paypal-button-container');
+              };
+              document.head.appendChild(script);
+            }
+          `}} />
+        </div>
+      )
+    } catch (error) {
+      console.error('Error en checkout:', error)
+      return c.redirect('/cursos')
+    }
+  })
+
+  // Página: Pago Exitoso
+  studentRoutes.get('/pago-exitoso', async (c) => {
+    const courseId = c.req.query('courseId')
+
     return c.render(
       <div>
-        <section className="section">
-          <div className="container text-center">
-            <h1>Error al cargar la evaluación</h1>
-            <p>Por favor, intenta de nuevo más tarde.</p>
-            <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
-          </div>
-        </section>
-      </div>
-    )
-  }
-})
-
-// Página: Resultado del Quiz
-app.get('/cursos/:courseSlug/quiz/:quizId/resultado/:attemptId', async (c) => {
-  try {
-    const { getCurrentUser } = await import('../auth-utils')
-    const user = await getCurrentUser(c)
-
-    if (!user) {
-      return c.redirect('/login')
-    }
-
-    const courseSlug = c.req.param('courseSlug')
-    const quizId = parseInt(c.req.param('quizId'))
-    const attemptId = parseInt(c.req.param('attemptId'))
-
-    // Obtener curso
-    const course = await c.env.DB.prepare(`
-      SELECT id, title, slug FROM courses WHERE slug = ?
-    `).bind(courseSlug).first<any>()
-
-    if (!course) {
-      return c.render(<div><section className="section"><div className="container text-center"><h1>Curso no encontrado</h1></div></section></div>)
-    }
-
-    // Obtener intento
-    const attempt = await c.env.DB.prepare(`
-      SELECT * FROM quiz_attempts
-      WHERE id = ? AND user_id = ? AND quiz_id = ?
-    `).bind(attemptId, user.id, quizId).first<any>()
-
-    if (!attempt) {
-      return c.render(<div><section className="section"><div className="container text-center"><h1>Resultado no encontrado</h1></div></section></div>)
-    }
-
-    // Obtener quiz
-    const quiz = await c.env.DB.prepare(`
-      SELECT * FROM quizzes WHERE id = ?
-    `).bind(quizId).first<any>()
-
-    // Obtener respuestas detalladas
-    const answers = await c.env.DB.prepare(`
-      SELECT
-        qa.*,
-        qq.question_text,
-        qq.question_type,
-        qq.explanation,
-        qq.points
-      FROM quiz_answers qa
-      JOIN quiz_questions qq ON qa.question_id = qq.id
-      WHERE qa.attempt_id = ?
-      ORDER BY qq.order_index ASC
-    `).bind(attemptId).all<any>()
-
-    // Obtener opciones para cada pregunta
-    const detailedAnswers = await Promise.all(
-      (answers.results || []).map(async (answer: any) => {
-        const options = await c.env.DB.prepare(`
-          SELECT * FROM quiz_options WHERE question_id = ? ORDER BY order_index
-        `).bind(answer.question_id).all<any>()
-
-        const selectedIds = JSON.parse(answer.selected_options)
-
-        return {
-          ...answer,
-          options: options.results || [],
-          selectedIds
-        }
-      })
-    )
-
-    return c.render(
-      <div>
-        <style dangerouslySetInnerHTML={{__html: `
-          .result-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-          }
-          .result-header {
-            background: white;
-            border-radius: 12px;
-            padding: 40px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            text-align: center;
-          }
-          .score-circle {
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            font-size: 2.5rem;
-            font-weight: 700;
-            position: relative;
-          }
-          .score-circle.passed {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-          }
-          .score-circle.failed {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-          }
-          .result-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 30px;
-          }
-          .stat-card {
-            background: #f8fafc;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-          }
-          .answer-review {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          }
-          .answer-review.correct {
-            border-left: 4px solid #10b981;
-          }
-          .answer-review.incorrect {
-            border-left: 4px solid #ef4444;
-          }
-          .option-review {
-            padding: 12px 15px;
-            margin: 8px 0;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-          }
-          .option-review.correct {
-            background: #dcfce7;
-            border: 2px solid #10b981;
-          }
-          .option-review.incorrect {
-            background: #fee2e2;
-            border: 2px solid #ef4444;
-          }
-          .option-review.not-selected {
-            background: #f8fafc;
-            border: 2px solid #e2e8f0;
-          }
-          .explanation-box {
-            background: #fef3c7;
-            border-left: 4px solid #f59e0b;
-            padding: 15px;
-            margin-top: 15px;
-            border-radius: 4px;
-          }
-        `}} />
-
-        <div className="result-container">
-          <div style="display: flex; align-items: center; gap: 10px; color: #64748b; margin-bottom: 20px;">
-            <a href="/mi-aprendizaje" style="color: #8b5cf6; text-decoration: none;">Mis Cursos</a>
-            <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
-            <a href={`/cursos/${courseSlug}`} style="color: #8b5cf6; text-decoration: none;">{course.title}</a>
-            <i className="fas fa-chevron-right" style="font-size: 12px;"></i>
-            <span>Resultado de Evaluación</span>
-          </div>
-
-          <div className="result-header">
-            <div className={`score-circle ${attempt.passed ? 'passed' : 'failed'}`}>
-              <div>{attempt.score.toFixed(0)}%</div>
-              <div style="font-size: 0.9rem; font-weight: 400;">{attempt.passed ? 'Aprobado' : 'No Aprobado'}</div>
+        <section className="section" style="padding: 100px 20px; text-align: center;">
+          <div className="container" style="max-width: 600px; margin: 0 auto;">
+            <div style="width: 100px; height: 100px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 30px; display: flex; align-items: center; justify-content: center;">
+              <i className="fas fa-check fa-3x" style="color: white;"></i>
             </div>
 
-            <h1 style="font-size: 2rem; color: #1e293b; margin-bottom: 10px;">{quiz.title}</h1>
+            <h1 style="color: #1e293b; margin-bottom: 20px;">¡Pago Exitoso!</h1>
+            <p style="font-size: 1.2rem; color: #64748b; margin-bottom: 30px;">
+              Tu inscripción ha sido procesada correctamente
+            </p>
 
-            {attempt.passed ? (
-              <p style="color: #10b981; font-size: 1.2rem; font-weight: 600;">
-                <i className="fas fa-check-circle"></i> ¡Felicitaciones! Has aprobado la evaluación
-              </p>
-            ) : (
-              <p style="color: #ef4444; font-size: 1.2rem; font-weight: 600;">
-                <i className="fas fa-times-circle"></i> No alcanzaste el puntaje mínimo de {quiz.passing_score}%
-              </p>
-            )}
-
-            <div className="result-stats">
-              <div className="stat-card">
-                <i className="fas fa-star fa-2x" style="color: #f59e0b; margin-bottom: 10px;"></i>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">{attempt.points_earned}/{attempt.total_points}</div>
-                <div style="color: #64748b; font-size: 0.9rem;">Puntos Obtenidos</div>
-              </div>
-              <div className="stat-card">
-                <i className="fas fa-clock fa-2x" style="color: #8b5cf6; margin-bottom: 10px;"></i>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">{Math.floor(attempt.time_taken / 60)}:{(attempt.time_taken % 60).toString().padStart(2, '0')}</div>
-                <div style="color: #64748b; font-size: 0.9rem;">Tiempo Tomado</div>
-              </div>
-              <div className="stat-card">
-                <i className="fas fa-check-circle fa-2x" style="color: #10b981; margin-bottom: 10px;"></i>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">{detailedAnswers.filter((a: any) => a.is_correct).length}/{detailedAnswers.length}</div>
-                <div style="color: #64748b; font-size: 0.9rem;">Respuestas Correctas</div>
-              </div>
+            <div style="padding: 30px; background: #f8fafc; border-radius: 12px; margin-bottom: 30px; text-align: left;">
+              <h3 style="color: #1e293b; margin-bottom: 15px;">¿Qué sigue?</h3>
+              <ul style="list-style: none; padding: 0; margin: 0;">
+                <li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                  <i className="fas fa-check-circle" style="color: #10b981; margin-right: 10px;"></i>
+                  Recibirás un correo de confirmación
+                </li>
+                <li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                  <i className="fas fa-check-circle" style="color: #10b981; margin-right: 10px;"></i>
+                  Acceso inmediato a todas las lecciones
+                </li>
+                <li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                  <i className="fas fa-check-circle" style="color: #10b981; margin-right: 10px;"></i>
+                  Descarga los recursos del curso
+                </li>
+                <li style="padding: 10px 0;">
+                  <i className="fas fa-check-circle" style="color: #10b981; margin-right: 10px;"></i>
+                  Únete a la comunidad privada
+                </li>
+              </ul>
             </div>
 
-            <div style="margin-top: 30px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-              <a href={`/cursos/${courseSlug}`} className="btn btn-primary">
-                <i className="fas fa-arrow-left"></i> Volver al Curso
+            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+              <a href="/mi-aprendizaje" className="btn btn-primary btn-lg">
+                <i className="fas fa-graduation-cap"></i> Ir a Mis Cursos
               </a>
-              {!attempt.passed && quiz.max_attempts && attempt.attempt_count < quiz.max_attempts && (
-                <a href={`/cursos/${courseSlug}/quiz/${quizId}`} className="btn btn-secondary">
-                  <i className="fas fa-redo"></i> Intentar de Nuevo
+              {courseId && (
+                <a href={`/curso/${courseId}`} className="btn btn-secondary btn-lg">
+                  <i className="fas fa-play"></i> Comenzar Curso
                 </a>
               )}
             </div>
           </div>
-
-          {quiz.show_correct_answers && (
-            <div>
-              <h2 style="font-size: 1.5rem; color: #1e293b; margin-bottom: 20px;">
-                <i className="fas fa-list-alt"></i> Revisión de Respuestas
-              </h2>
-
-              {detailedAnswers.map((answer: any, idx: number) => (
-                <div className={`answer-review ${answer.is_correct ? 'correct' : 'incorrect'}`} key={answer.question_id}>
-                  <div style="display: flex; align-items: start; justify-content: space-between; margin-bottom: 15px;">
-                    <div style="display: flex; gap: 15px; align-items: start; flex: 1;">
-                      <div style={`font-size: 1.5rem; ${answer.is_correct ? 'color: #10b981' : 'color: #ef4444'}`}>
-                        {answer.is_correct ? <i className="fas fa-check-circle"></i> : <i className="fas fa-times-circle"></i>}
-                      </div>
-                      <div style="flex: 1;">
-                        <div style="font-weight: 600; color: #64748b; margin-bottom: 5px;">Pregunta {idx + 1}</div>
-                        <h3 style="font-size: 1.2rem; color: #1e293b; margin-bottom: 15px;">{answer.question_text}</h3>
-
-                        {answer.options.map((option: any) => {
-                          const isSelected = answer.selectedIds.includes(option.id)
-                          const isCorrect = option.is_correct
-
-                          let className = 'option-review'
-                          if (isCorrect) {
-                            className += ' correct'
-                          } else if (isSelected) {
-                            className += ' incorrect'
-                          } else {
-                            className += ' not-selected'
-                          }
-
-                          return (
-                            <div className={className} key={option.id}>
-                              {isCorrect && <i className="fas fa-check" style="color: #10b981;"></i>}
-                              {!isCorrect && isSelected && <i className="fas fa-times" style="color: #ef4444;"></i>}
-                              {!isCorrect && !isSelected && <i className="far fa-circle" style="color: #94a3b8;"></i>}
-                              <span>{option.option_text}</span>
-                            </div>
-                          )
-                        })}
-
-                        {answer.explanation && (
-                          <div className="explanation-box">
-                            <strong style="color: #d97706;"><i className="fas fa-lightbulb"></i> Explicación:</strong>
-                            <p style="margin: 5px 0 0 0; color: #78350f;">{answer.explanation}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div style="text-align: right;">
-                      <div style={`font-weight: 700; font-size: 1.1rem; ${answer.is_correct ? 'color: #10b981' : 'color: #ef4444'}`}>
-                        {answer.points_earned}/{answer.points} pts
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  } catch (error) {
-    console.error('Error al cargar resultado:', error)
-    return c.render(
-      <div>
-        <section className="section">
-          <div className="container text-center">
-            <h1>Error al cargar el resultado</h1>
-            <p>Por favor, intenta de nuevo más tarde.</p>
-            <a href="/mi-aprendizaje" className="btn btn-primary">Volver a Mis Cursos</a>
-          </div>
         </section>
       </div>
     )
-  }
-})
+  })
 
-// ===== RUTAS DE PAGOS Y CHECKOUT =====
-
-// Página: Checkout
-app.get('/checkout/:courseId', async (c) => {
-  try {
-    const courseId = parseInt(c.req.param('courseId'))
-
-    // Verificar autenticación
-    const { getCurrentUser } = await import('../auth-utils')
-    const user = await getCurrentUser(c)
-
-    if (!user) {
-      return c.redirect(`/login?redirect=/checkout/${courseId}`)
-    }
-
-    // Obtener información del curso
-    const course = await c.env.DB.prepare(`
-      SELECT id, title, subtitle, price, currency, featured_image, duration_weeks, level
-      FROM courses
-      WHERE id = ? AND published = 1
-    `).bind(courseId).first<any>()
-
-    if (!course) {
-      return c.redirect('/cursos')
-    }
-
-    // Verificar si ya está inscrito
-    const enrollment = await c.env.DB.prepare(`
-      SELECT id FROM paid_enrollments
-      WHERE user_id = ? AND course_id = ? AND payment_status = 'completed'
-    `).bind(user.id, courseId).first<any>()
-
-    if (enrollment) {
-      return c.redirect('/mi-aprendizaje')
-    }
-
-    return c.render(
-      <div>
-        <section className="hero hero-small">
-          <div className="container">
-            <h1>Checkout</h1>
-            <p className="lead">Completa tu inscripción al curso</p>
-          </div>
-        </section>
-
-        <section className="section">
-          <div className="container">
-            <div className="checkout-container" style="max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1fr 400px; gap: 40px;">
-
-              {/* Columna izquierda: Métodos de pago */}
-              <div className="payment-methods">
-                <h2 style="margin-bottom: 30px;">Método de Pago</h2>
-
-                <div id="checkout-message" className="auth-message" style="display: none; margin-bottom: 20px;"></div>
-
-                {/* Selector de método de pago */}
-                <div className="payment-selector" style="display: flex; gap: 15px; margin-bottom: 30px;">
-                  <button
-                    id="select-stripe"
-                    className="payment-method-btn active"
-                    onclick="selectPaymentMethod('stripe')"
-                    style="flex: 1; padding: 20px; border: 2px solid #8b5cf6; border-radius: 12px; background: white; cursor: pointer; transition: all 0.3s;"
-                  >
-                    <i className="fab fa-cc-stripe fa-2x" style="color: #635bff; margin-bottom: 10px;"></i>
-                    <div style="font-weight: 600; color: #1e293b;">Tarjeta de Crédito/Débito</div>
-                    <div style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">Visa, Mastercard, Amex</div>
-                  </button>
-
-                  <button
-                    id="select-paypal"
-                    className="payment-method-btn"
-                    onclick="selectPaymentMethod('paypal')"
-                    style="flex: 1; padding: 20px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; transition: all 0.3s;"
-                  >
-                    <i className="fab fa-paypal fa-2x" style="color: #0070ba; margin-bottom: 10px;"></i>
-                    <div style="font-weight: 600; color: #1e293b;">PayPal</div>
-                    <div style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">Pago rápido y seguro</div>
-                  </button>
-                </div>
-
-                {/* Formulario de Stripe */}
-                <div id="stripe-payment" style="display: block;">
-                  <div style="padding: 30px; background: #f8fafc; border-radius: 12px; margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 20px; color: #1e293b;">Información de Tarjeta</h3>
-
-                    <form id="payment-form">
-                      <div className="form-group">
-                        <label>Nombre en la tarjeta</label>
-                        <input
-                          type="text"
-                          id="card-holder-name"
-                          className="form-control"
-                          placeholder="Juan Pérez"
-                          required
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Detalles de la tarjeta</label>
-                        <div id="card-element" style="padding: 12px; background: white; border: 1px solid #e2e8f0; border-radius: 8px;">
-                          {/* Stripe Elements se montará aquí */}
-                        </div>
-                        <div id="card-errors" role="alert" style="color: #dc2626; font-size: 0.875rem; margin-top: 8px;"></div>
-                      </div>
-
-                      <button
-                        type="submit"
-                        id="submit-stripe"
-                        className="btn btn-primary btn-lg btn-block"
-                        style="margin-top: 20px;"
-                      >
-                        <i className="fas fa-lock"></i> Pagar ${course.price} {course.currency}
-                      </button>
-                    </form>
-
-                    <div style="margin-top: 20px; text-align: center; color: #64748b; font-size: 0.85rem;">
-                      <i className="fas fa-shield-alt"></i> Pago seguro encriptado por Stripe
-                    </div>
-                  </div>
-                </div>
-
-                {/* PayPal */}
-                <div id="paypal-payment" style="display: none;">
-                  <div style="padding: 30px; background: #f8fafc; border-radius: 12px; margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 20px; color: #1e293b;">Pagar con PayPal</h3>
-
-                    <div id="paypal-button-container" style="margin-bottom: 20px;"></div>
-
-                    <div style="text-align: center; color: #64748b; font-size: 0.85rem;">
-                      <i className="fas fa-shield-alt"></i> Serás redirigido a PayPal para completar el pago
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Columna derecha: Resumen del pedido */}
-              <div className="order-summary">
-                <div style="padding: 30px; background: white; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); position: sticky; top: 100px;">
-                  <h3 style="margin-bottom: 20px; color: #1e293b;">Resumen del Pedido</h3>
-
-                  <div style="margin-bottom: 20px;">
-                    <img
-                      src={course.featured_image}
-                      alt={course.title}
-                      style="width: 100%; border-radius: 8px; margin-bottom: 15px;"
-                    />
-                    <h4 style="color: #1e293b; margin-bottom: 10px; font-size: 1.1rem;">{course.title}</h4>
-                    <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 15px;">{course.subtitle}</p>
-
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
-                      <span style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; background: #f1f5f9; border-radius: 20px; font-size: 0.85rem; color: #64748b;">
-                        <i className="fas fa-clock"></i> {course.duration_weeks} semanas
-                      </span>
-                      <span style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; background: #f1f5f9; border-radius: 20px; font-size: 0.85rem; color: #64748b;">
-                        <i className="fas fa-signal"></i> {course.level}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style="border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 20px 0; margin: 20px 0;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                      <span style="color: #64748b;">Precio del curso:</span>
-                      <span style="font-weight: 600; color: #1e293b;">${course.price} {course.currency}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                      <span style="color: #64748b;">Descuento:</span>
-                      <span style="font-weight: 600; color: #10b981;">$0.00</span>
-                    </div>
-                  </div>
-
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-                    <span style="font-size: 1.1rem; font-weight: 600; color: #1e293b;">Total:</span>
-                    <span style="font-size: 1.3rem; font-weight: 700; color: #8b5cf6;">${course.price} {course.currency}</span>
-                  </div>
-
-                  <div style="padding: 15px; background: #f0fdf4; border-radius: 8px; margin-bottom: 20px;">
-                    <div style="display: flex; align-items: center; gap: 10px; color: #16a34a; font-size: 0.9rem;">
-                      <i className="fas fa-check-circle"></i>
-                      <span style="font-weight: 600;">Acceso inmediato al curso</span>
-                    </div>
-                  </div>
-
-                  <div style="font-size: 0.85rem; color: #64748b;">
-                    <p style="margin-bottom: 10px;">✓ Acceso de por vida</p>
-                    <p style="margin-bottom: 10px;">✓ Certificado al completar</p>
-                    <p style="margin-bottom: 10px;">✓ Recursos descargables</p>
-                    <p style="margin-bottom: 0;">✓ Comunidad privada</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <script src="https://js.stripe.com/v3/"></script>
-        <script dangerouslySetInnerHTML={{__html: `
-          const stripe = Stripe('${c.env.STRIPE_PUBLISHABLE_KEY}');
-          const elements = stripe.elements();
-          const cardElement = elements.create('card', {
-            style: {
-              base: {
-                fontSize: '16px',
-                color: '#1e293b',
-                '::placeholder': { color: '#94a3b8' }
-              }
-            }
-          });
-          cardElement.mount('#card-element');
-
-          // Manejo de errores de tarjeta
-          cardElement.on('change', (event) => {
-            const displayError = document.getElementById('card-errors');
-            if (event.error) {
-              displayError.textContent = event.error.message;
-            } else {
-              displayError.textContent = '';
-            }
-          });
-
-          // Selector de método de pago
-          function selectPaymentMethod(method) {
-            const stripBtn = document.getElementById('select-stripe');
-            const paypalBtn = document.getElementById('select-paypal');
-            const stripeDiv = document.getElementById('stripe-payment');
-            const paypalDiv = document.getElementById('paypal-payment');
-
-            if (method === 'stripe') {
-              stripBtn.classList.add('active');
-              stripBtn.style.borderColor = '#8b5cf6';
-              paypalBtn.classList.remove('active');
-              paypalBtn.style.borderColor = '#e2e8f0';
-              stripeDiv.style.display = 'block';
-              paypalDiv.style.display = 'none';
-            } else {
-              paypalBtn.classList.add('active');
-              paypalBtn.style.borderColor = '#8b5cf6';
-              stripBtn.classList.remove('active');
-              stripBtn.style.borderColor = '#e2e8f0';
-              paypalDiv.style.display = 'block';
-              stripeDiv.style.display = 'none';
-              loadPayPalButton();
-            }
-          }
-
-          // Formulario de pago con Stripe
-          const form = document.getElementById('payment-form');
-          form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const submitButton = document.getElementById('submit-stripe');
-            const messageDiv = document.getElementById('checkout-message');
-            const originalText = submitButton.innerHTML;
-
-            submitButton.disabled = true;
-            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-            messageDiv.style.display = 'none';
-
-            try {
-              // Crear Payment Intent
-              const response = await fetch('/api/create-payment-intent', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  courseId: ${courseId},
-                  paymentMethod: 'stripe'
-                })
-              });
-
-              const { clientSecret, error } = await response.json();
-
-              if (error) {
-                throw new Error(error);
-              }
-
-              // Confirmar pago
-              const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-                payment_method: {
-                  card: cardElement,
-                  billing_details: {
-                    name: document.getElementById('card-holder-name').value
-                  }
-                }
-              });
-
-              if (stripeError) {
-                throw new Error(stripeError.message);
-              }
-
-              // Verificar pago en el servidor
-              const verifyResponse = await fetch('/api/verify-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  paymentIntentId: paymentIntent.id,
-                  courseId: ${courseId}
-                })
-              });
-
-              const verifyData = await verifyResponse.json();
-
-              if (verifyData.success) {
-                window.location.href = '/pago-exitoso?courseId=${courseId}';
-              } else {
-                throw new Error('Error al verificar el pago');
-              }
-
-            } catch (error) {
-              messageDiv.className = 'auth-message error';
-              messageDiv.textContent = error.message;
-              messageDiv.style.display = 'block';
-              submitButton.disabled = false;
-              submitButton.innerHTML = originalText;
-            }
-          });
-
-          // PayPal
-          function loadPayPalButton() {
-            if (window.paypalLoaded) return;
-
-            const script = document.createElement('script');
-            script.src = 'https://www.paypal.com/sdk/js?client-id=${c.env.PAYPAL_CLIENT_ID}&currency=${course.currency}';
-            script.onload = () => {
-              window.paypalLoaded = true;
-              paypal.Buttons({
-                createOrder: async () => {
-                  const response = await fetch('/api/create-paypal-order', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ courseId: ${courseId} })
-                  });
-                  const data = await response.json();
-                  return data.orderId;
-                },
-                onApprove: async (data) => {
-                  const response = await fetch('/api/capture-paypal-order', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      orderId: data.orderID,
-                      courseId: ${courseId}
-                    })
-                  });
-                  const result = await response.json();
-                  if (result.success) {
-                    window.location.href = '/pago-exitoso?courseId=${courseId}';
-                  }
-                },
-                onError: (err) => {
-                  const messageDiv = document.getElementById('checkout-message');
-                  messageDiv.className = 'auth-message error';
-                  messageDiv.textContent = 'Error al procesar el pago con PayPal';
-                  messageDiv.style.display = 'block';
-                }
-              }).render('#paypal-button-container');
-            };
-            document.head.appendChild(script);
-          }
-        `}} />
-      </div>
-    )
-  } catch (error) {
-    console.error('Error en checkout:', error)
-    return c.redirect('/cursos')
-  }
-})
-
-// Página: Pago Exitoso
-app.get('/pago-exitoso', async (c) => {
-  const courseId = c.req.query('courseId')
-
-  return c.render(
-    <div>
-      <section className="section" style="padding: 100px 20px; text-align: center;">
-        <div className="container" style="max-width: 600px; margin: 0 auto;">
-          <div style="width: 100px; height: 100px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 30px; display: flex; align-items: center; justify-content: center;">
-            <i className="fas fa-check fa-3x" style="color: white;"></i>
-          </div>
-
-          <h1 style="color: #1e293b; margin-bottom: 20px;">¡Pago Exitoso!</h1>
-          <p style="font-size: 1.2rem; color: #64748b; margin-bottom: 30px;">
-            Tu inscripción ha sido procesada correctamente
-          </p>
-
-          <div style="padding: 30px; background: #f8fafc; border-radius: 12px; margin-bottom: 30px; text-align: left;">
-            <h3 style="color: #1e293b; margin-bottom: 15px;">¿Qué sigue?</h3>
-            <ul style="list-style: none; padding: 0; margin: 0;">
-              <li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
-                <i className="fas fa-check-circle" style="color: #10b981; margin-right: 10px;"></i>
-                Recibirás un correo de confirmación
-              </li>
-              <li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
-                <i className="fas fa-check-circle" style="color: #10b981; margin-right: 10px;"></i>
-                Acceso inmediato a todas las lecciones
-              </li>
-              <li style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
-                <i className="fas fa-check-circle" style="color: #10b981; margin-right: 10px;"></i>
-                Descarga los recursos del curso
-              </li>
-              <li style="padding: 10px 0;">
-                <i className="fas fa-check-circle" style="color: #10b981; margin-right: 10px;"></i>
-                Únete a la comunidad privada
-              </li>
-            </ul>
-          </div>
-
-          <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-            <a href="/mi-aprendizaje" className="btn btn-primary btn-lg">
-              <i className="fas fa-graduation-cap"></i> Ir a Mis Cursos
-            </a>
-            {courseId && (
-              <a href={`/curso/${courseId}`} className="btn btn-secondary btn-lg">
-                <i className="fas fa-play"></i> Comenzar Curso
-              </a>
-            )}
-          </div>
-        </div>
-      </section>
-    </div>
-  )
-})
-
-export default app
+  app.route('/', studentRoutes)
+}
