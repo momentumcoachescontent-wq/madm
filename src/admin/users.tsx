@@ -52,11 +52,12 @@ const UsersListHelper = (users: any[]) => html`
 `
 
 app.get('/', async (c) => {
-  const users = await c.env.DB.prepare('SELECT * FROM users ORDER BY created_at DESC').all()
+  const { listUsers } = await import('../models/users')
+  const users = await listUsers(c.env.DB)
 
   return c.html(AdminLayout({
     title: 'Gestión de Usuarios',
-    children: UsersListHelper(users.results || []),
+    children: UsersListHelper(users),
     activeItem: 'users',
     headerActions: html`<a href="/admin" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Panel</a>`
   }))

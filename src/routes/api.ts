@@ -94,9 +94,8 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       }
 
       // Verificar si el email ya existe
-      const existingUser = await c.env.DB.prepare(`
-        SELECT id FROM users WHERE email = ?
-      `).bind(email).first<any>()
+      const { getUserByEmail, createUser } = await import('../models/users')
+      const existingUser = await getUserByEmail(c.env.DB, email as string)
 
       if (existingUser) {
         return c.json({ error: 'Este email ya está registrado' }, 400)
@@ -109,12 +108,16 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       const passwordHash = await hashPassword(password as string)
 
       // Crear usuario
-      const result = await c.env.DB.prepare(`
-        INSERT INTO users (name, email, password_hash, role, active, email_verified)
-        VALUES (?, ?, ?, 'student', 1, 0)
-      `).bind(name, email, passwordHash).run()
+      const result = await createUser(c.env.DB, {
+        name: name as string,
+        email: email as string,
+        password_hash: passwordHash,
+        role: 'student',
+        active: 1,
+        email_verified: 0
+      })
 
-      const userId = result.meta.last_row_id
+      const userId = result.last_row_id as number
 
       // Crear sesión
       const sessionToken = await createSession(c.env.DB, userId)
@@ -148,11 +151,8 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       }
 
       // Buscar usuario
-      const user = await c.env.DB.prepare(`
-        SELECT id, email, name, password_hash, role, active
-        FROM users
-        WHERE email = ?
-      `).bind(email).first<any>()
+      const { getUserByEmail } = await import('../models/users')
+      const user = await getUserByEmail(c.env.DB, email as string)
 
       if (!user || !user.active) {
         return c.json({ error: 'Credenciales inválidas' }, 401)
@@ -160,7 +160,7 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
 
       // Verificar contraseña
       const { verifyPassword, createSession } = await import('../auth-utils')
-      const isValid = await verifyPassword(password as string, user.password_hash as string)
+      const isValid = await verifyPassword(password as string, user.password_hash)
 
       if (!isValid) {
         return c.json({ error: 'Credenciales inválidas' }, 401)

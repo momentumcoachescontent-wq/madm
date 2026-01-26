@@ -17,7 +17,7 @@ const app = new Hono<{ Bindings: CloudflareBindings }>()
 app.use('*', adminMiddleware)
 
 // Helper: Dashboard View
-const DashboardHelper = (postsCount: any, usersCount: any, coursesCount: any, lessonsCount: any) => html`
+const DashboardHelper = (postsCount: number, usersCount: number, coursesCount: any, lessonsCount: any) => html`
     <div style="margin-bottom: 40px;">
       <h1 style="font-size: 2.5rem; color: #1e293b; margin-bottom: 10px;">Panel de Administración</h1>
       <p style="color: #64748b; font-size: 1.2rem;">Bienvenido al centro de control de Más Allá del Miedo</p>
@@ -35,7 +35,7 @@ const DashboardHelper = (postsCount: any, usersCount: any, coursesCount: any, le
           <h2 style="font-size: 1.5rem; margin-bottom: 10px; color: #1e293b;">Gestionar Blog</h2>
           <p style="color: #64748b;">Crear artículos, editar contenido y programar publicaciones.</p>
           <div style="margin-top: 20px; font-size: 2rem; font-weight: 700; color: #8b5cf6;">
-            ${postsCount?.count || 0} Posts
+            ${postsCount} Posts
           </div>
         </div>
       </a>
@@ -80,7 +80,7 @@ const DashboardHelper = (postsCount: any, usersCount: any, coursesCount: any, le
           <h2 style="font-size: 1.5rem; margin-bottom: 10px; color: #1e293b;">Usuarios</h2>
           <p style="color: #64748b;">Gestionar usuarios registrados y permisos.</p>
           <div style="margin-top: 20px; font-size: 2rem; font-weight: 700; color: #f59e0b;">
-            ${usersCount?.count || 0} Usuarios
+            ${usersCount} Usuarios
           </div>
         </div>
       </a>
@@ -102,9 +102,12 @@ const DashboardHelper = (postsCount: any, usersCount: any, coursesCount: any, le
 
 // Main Dashboard
 app.get('/', async (c) => {
+  const { countBlogPosts } = await import('../models/blog')
+  const { countUsers } = await import('../models/users')
+
   // Fetch stats
-  const postsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM blog_posts').first()
-  const usersCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM users').first()
+  const postsCount = await countBlogPosts(c.env.DB)
+  const usersCount = await countUsers(c.env.DB)
   const coursesCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM courses').first()
   const lessonsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM lessons').first()
 
