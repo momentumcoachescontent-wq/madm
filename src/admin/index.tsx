@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { html } from 'hono/html'
 import { adminMiddleware } from '../middleware/admin'
-import { CloudflareBindings } from '../index'
+import { CloudflareBindings } from '../types'
 import { AdminLayout } from './layout'
 import blogApp from './blog'
 import uploadApp from './upload'
