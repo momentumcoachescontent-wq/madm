@@ -1,24 +1,12 @@
 import { Hono } from 'hono'
 import { html } from 'hono/html'
+import { AdminLayout } from './layout'
 
 type Bindings = {
   IMAGES_BUCKET: R2Bucket
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
-
-// Helper for Admin Layout (simplified)
-const AdminLayout = (children: unknown, title: string) => html`
-  <div class="admin-container" style="padding: 20px;">
-    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-      <h1>${title}</h1>
-      <a href="/admin" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> Volver al Dashboard
-      </a>
-    </div>
-    ${children}
-  </div>
-`
 
 // View: Media Library Helper
 const MediaLibraryHelper = (objects: R2Object[], cursor?: string) => html`
@@ -290,7 +278,12 @@ const MediaLibraryHelper = (objects: R2Object[], cursor?: string) => html`
 app.get('/', async (c) => {
   try {
     const list = await c.env.IMAGES_BUCKET.list({ limit: 100 })
-    return c.render(AdminLayout(MediaLibraryHelper(list.objects), 'Biblioteca Multimedia'))
+    return c.html(AdminLayout({
+      title: 'Biblioteca Multimedia',
+      children: MediaLibraryHelper(list.objects),
+      activeItem: 'media',
+      headerActions: html`<a href="/admin" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Dashboard</a>`
+    }))
   } catch (error) {
     return c.text('Error listing files: ' + (error as Error).message, 500)
   }

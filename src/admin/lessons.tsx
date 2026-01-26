@@ -1,28 +1,12 @@
 import { Hono } from 'hono'
 import { html } from 'hono/html'
+import { AdminLayout } from './layout'
 
 type Bindings = {
   DB: D1Database
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
-
-const AdminLayout = (children: unknown, title: string) => html`
-  <div class="admin-container" style="padding: 20px; max-width: 1200px; margin: 0 auto;">
-    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-      <h1 style="color: #1e293b;">${title}</h1>
-      <div style="display: flex; gap: 10px;">
-        <a href="/admin/lessons/new" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Nueva Lección
-        </a>
-        <a href="/admin" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Volver al Panel
-        </a>
-      </div>
-    </div>
-    ${children}
-  </div>
-`
 
 // Form Helper
 const LessonForm = (lesson: any = {}, courses: any[] = []) => {
@@ -151,13 +135,23 @@ app.get('/', async (c) => {
     ORDER BY c.title ASC, l.module_number ASC, l.lesson_number ASC
   `).all()
 
-  return c.render(AdminLayout(LessonListHelper(lessons.results || []), 'Gestión de Lecciones'))
+  return c.html(AdminLayout({
+    title: 'Gestión de Lecciones',
+    children: LessonListHelper(lessons.results || []),
+    activeItem: 'lessons',
+    headerActions: html`<a href="/admin/lessons/new" class="btn btn-primary"><i class="fas fa-plus"></i> Nueva Lección</a>`
+  }))
 })
 
 // New
 app.get('/new', async (c) => {
   const courses = await c.env.DB.prepare('SELECT id, title FROM courses ORDER BY title').all()
-  return c.render(AdminLayout(LessonForm({}, courses.results), 'Crear Nueva Lección'))
+  return c.html(AdminLayout({
+    title: 'Crear Nueva Lección',
+    children: LessonForm({}, courses.results),
+    activeItem: 'lessons',
+    headerActions: html`<a href="/admin/lessons" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Listado</a>`
+  }))
 })
 
 // Edit
@@ -168,7 +162,12 @@ app.get('/:id', async (c) => {
 
   const courses = await c.env.DB.prepare('SELECT id, title FROM courses ORDER BY title').all()
 
-  return c.render(AdminLayout(LessonForm(lesson, courses.results), 'Editar Lección'))
+  return c.html(AdminLayout({
+    title: 'Editar Lección',
+    children: LessonForm(lesson, courses.results),
+    activeItem: 'lessons',
+    headerActions: html`<a href="/admin/lessons" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Listado</a>`
+  }))
 })
 
 // Create Action
