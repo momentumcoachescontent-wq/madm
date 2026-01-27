@@ -167,7 +167,7 @@ export const AdminLayout = (props: LayoutProps) => {
             <div class="sidebar-header">
                 <i class="fas fa-brain" style="color: var(--primary); font-size: 1.5rem;"></i>
                 <a href="/admin" class="sidebar-logo">Admin Panel</a>
-                <i class="fas fa-times menu-toggle" onclick="toggleSidebar()" style="margin-left: auto; color: #94a3b8;"></i>
+                <i class="fas fa-times menu-toggle" style="margin-left: auto; color: #94a3b8;"></i>
             </div>
 
             <nav class="sidebar-nav">
@@ -184,7 +184,7 @@ export const AdminLayout = (props: LayoutProps) => {
                     <i class="fas fa-external-link-alt"></i>
                     <span>Ver Sitio Web</span>
                 </a>
-                <button onclick="logout()" class="nav-item" style="width: 100%; background: none; border: none; cursor: pointer; text-align: left; padding: 12px 25px; font-family: inherit;">
+                <button id="logout-btn" class="nav-item" style="width: 100%; background: none; border: none; cursor: pointer; text-align: left; padding: 12px 25px; font-family: inherit;">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Cerrar Sesión</span>
                 </button>
@@ -194,7 +194,7 @@ export const AdminLayout = (props: LayoutProps) => {
         <main class="admin-main">
             <header class="admin-header">
                 <div class="header-title">
-                    <i class="fas fa-bars menu-toggle" onclick="toggleSidebar()"></i>
+                    <i class="fas fa-bars menu-toggle"></i>
                     <h1>${title}</h1>
                 </div>
                 <div class="header-actions">
@@ -207,28 +207,7 @@ export const AdminLayout = (props: LayoutProps) => {
             </div>
         </main>
 
-        <script>
-            function toggleSidebar() {
-                document.getElementById('sidebar').classList.toggle('open');
-            }
-
-            // Close sidebar when clicking outside on mobile
-            document.addEventListener('click', function(event) {
-                const sidebar = document.getElementById('sidebar');
-                const toggle = document.querySelector('.menu-toggle');
-                const isClickInside = sidebar.contains(event.target) || event.target.classList.contains('menu-toggle');
-
-                if (!isClickInside && sidebar.classList.contains('open') && window.innerWidth <= 768) {
-                    sidebar.classList.remove('open');
-                }
-            });
-
-            async function logout() {
-                if(!confirm('¿Cerrar sesión?')) return;
-                await fetch('/api/logout', { method: 'POST' });
-                window.location.href = '/login';
-            }
-        </script>
+        <script src="/static/admin.js"></script>
     </body>
     </html>
   `

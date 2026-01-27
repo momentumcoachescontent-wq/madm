@@ -11,9 +11,22 @@ export function initCheckout(options: CheckoutOptions) {
 
   // Initialize Stripe
   if (typeof (window as any).Stripe === 'undefined') {
-    console.error('Stripe.js not loaded');
+    // Wait for Stripe to load
+    const interval = setInterval(() => {
+        if (typeof (window as any).Stripe !== 'undefined') {
+            clearInterval(interval);
+            setupStripe(options);
+        }
+    }, 100);
+    setTimeout(() => clearInterval(interval), 10000); // 10s timeout
     return;
   }
+
+  setupStripe(options);
+}
+
+function setupStripe(options: CheckoutOptions) {
+  const { stripeKey, paypalClientId, courseId, currency } = options;
 
   const stripe = (window as any).Stripe(stripeKey);
   const elements = stripe.elements();
@@ -40,7 +53,7 @@ export function initCheckout(options: CheckoutOptions) {
     }
   });
 
-  // Payment Method Selection
+  // Payment Method Selection - Expose to global scope for HTML onclick
   (window as any).selectPaymentMethod = function(method: 'stripe' | 'paypal') {
     const stripeBtn = document.getElementById('select-stripe');
     const paypalBtn = document.getElementById('select-paypal');
@@ -69,6 +82,16 @@ export function initCheckout(options: CheckoutOptions) {
       loadPayPalButton(paypalClientId, currency, courseId);
     }
   };
+
+  // Also attach event listeners directly if possible (in case inline onclick is removed)
+  const stripeBtn = document.getElementById('select-stripe');
+  if (stripeBtn) {
+      stripeBtn.addEventListener('click', () => (window as any).selectPaymentMethod('stripe'));
+  }
+  const paypalBtn = document.getElementById('select-paypal');
+  if (paypalBtn) {
+      paypalBtn.addEventListener('click', () => (window as any).selectPaymentMethod('paypal'));
+  }
 
   // Handle Stripe Form Submission
   const form = document.getElementById('payment-form');
@@ -229,4 +252,18 @@ function loadPayPalButton(clientId: string, currency: string, courseId: number) 
     }).render('#paypal-button-container');
   };
   document.head.appendChild(script);
+}
+
+export function init() {
+  const config = document.getElementById('checkout-config');
+  if (config) {
+    const options = {
+      stripeKey: config.dataset.stripeKey!,
+      paypalClientId: config.dataset.paypalClientId!,
+      courseId: parseInt(config.dataset.courseId!),
+      currency: config.dataset.currency!,
+      price: parseFloat(config.dataset.price!)
+    };
+    initCheckout(options);
+  }
 }

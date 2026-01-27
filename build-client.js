@@ -3,9 +3,12 @@ import esbuild from 'esbuild';
 const watch = process.argv.includes('--watch');
 
 const ctx = await esbuild.context({
-  entryPoints: ['src/client/index.ts'],
+  entryPoints: {
+    client: 'src/client/index.ts',
+    admin: 'src/client/admin.ts',
+  },
   bundle: true,
-  outfile: 'public/static/client.js',
+  outdir: 'public/static',
   minify: true,
   sourcemap: true,
   platform: 'browser',
@@ -15,9 +18,9 @@ const ctx = await esbuild.context({
 
 if (watch) {
   await ctx.watch();
-  console.log('Watching client bundle...');
+  console.log('Watching client bundles...');
 } else {
   await ctx.rebuild();
   await ctx.dispose();
-  console.log('Client bundle built successfully: public/static/client.js');
+  console.log('Client bundles built successfully: public/static/');
 }

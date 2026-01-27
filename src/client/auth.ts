@@ -30,8 +30,12 @@ export function initLogin(formId: string = 'login-form', messageId: string = 'au
           messageDiv.style.display = 'block';
         }
 
+        // Check for redirect param
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirect = urlParams.get('redirect');
+
         setTimeout(() => {
-          window.location.href = '/mi-aprendizaje';
+          window.location.href = redirect || '/mi-aprendizaje';
         }, 1000);
       } else {
         throw new Error(data.error || 'Error al iniciar sesión');
@@ -153,5 +157,14 @@ export async function checkAuth() {
     remove('dashboard-link');
     remove('admin-link');
     show('login-link');
+  }
+}
+
+export function init() {
+  if (document.getElementById('login-form')) {
+    initLogin();
+  }
+  if (document.getElementById('register-form')) {
+    initRegister();
   }
 }
