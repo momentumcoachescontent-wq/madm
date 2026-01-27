@@ -23,8 +23,23 @@ export function initVideoTracking(lessonId: number, courseId: number, lastPositi
 
   // YouTube
   function initYouTubeTracking() {
+    const isTrustedYouTubeUrl = (urlString: string): boolean => {
+      try {
+        const parsedUrl = new URL(urlString, window.location.origin);
+        const protocol = parsedUrl.protocol;
+        if (protocol !== 'https:' && protocol !== 'http:') {
+          return false;
+        }
+        const hostname = parsedUrl.hostname.toLowerCase();
+        const allowedHosts = ['youtube.com', 'www.youtube.com', 'm.youtube.com'];
+        return allowedHosts.includes(hostname) || hostname.endsWith('.youtube.com');
+      } catch {
+        return false;
+      }
+    };
+
     const iframe = document.querySelector('iframe');
-    if (!iframe || !iframe.src.includes('youtube.com')) return;
+    if (!iframe || !isTrustedYouTubeUrl(iframe.src)) return;
 
     if (!(window as any).YT) {
       const tag = document.createElement('script');
