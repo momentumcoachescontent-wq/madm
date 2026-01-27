@@ -31,7 +31,7 @@ export function initVideoTracking(lessonId: number, courseId: number, lastPositi
           return false;
         }
         const hostname = parsedUrl.hostname.toLowerCase();
-        const allowedHosts = ['youtube.com', 'www.youtube.com', 'm.youtube.com'];
+        const allowedHosts = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'];
         return allowedHosts.includes(hostname) || hostname.endsWith('.youtube.com');
       } catch {
         return false;
@@ -98,8 +98,23 @@ export function initVideoTracking(lessonId: number, courseId: number, lastPositi
 
   // Vimeo
   function initVimeoTracking() {
+    const isTrustedVimeoUrl = (urlString: string): boolean => {
+      try {
+        const parsedUrl = new URL(urlString, window.location.origin);
+        const protocol = parsedUrl.protocol;
+        if (protocol !== 'https:' && protocol !== 'http:') {
+          return false;
+        }
+        const hostname = parsedUrl.hostname.toLowerCase();
+        const allowedHosts = ['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'];
+        return allowedHosts.includes(hostname) || hostname.endsWith('.vimeo.com');
+      } catch {
+        return false;
+      }
+    };
+
     const iframe = document.querySelector('iframe');
-    if (!iframe || !iframe.src.includes('vimeo.com')) return;
+    if (!iframe || !isTrustedVimeoUrl(iframe.src)) return;
 
     if (!(window as any).Vimeo) {
       const script = document.createElement('script');
@@ -183,7 +198,8 @@ export function initVideoTracking(lessonId: number, courseId: number, lastPositi
         duration: Math.round(currentVideoDuration),
         courseId
       });
-      navigator.sendBeacon(`/api/lessons/${lessonId}/progress`, data);
+      const blob = new Blob([data], { type: 'application/json' });
+      navigator.sendBeacon(`/api/lessons/${lessonId}/progress`, blob);
     }
   });
 
@@ -208,7 +224,7 @@ export function initCompletion(lessonId: number, courseId: number, isCompletedIn
         body: JSON.stringify({ completed: !isCompleted, courseId })
       });
 
-      const data = await response.json();
+      const data = await response.json() as any;
 
       if (data.success) {
         isCompleted = !isCompleted;
@@ -251,6 +267,7 @@ export function initNotes(lessonId: number, courseId: number) {
   const notesArea = document.getElementById('notesArea') as HTMLTextAreaElement;
 
   const saveNotes = async () => {
+    if (!notesArea) return;
     try {
       const notes = notesArea.value;
       const saveStatus = document.getElementById('saveStatus');
@@ -261,7 +278,7 @@ export function initNotes(lessonId: number, courseId: number) {
         body: JSON.stringify({ notes, courseId })
       });
 
-      const data = await response.json();
+      const data = await response.json() as any;
 
       if (data.success) {
         if (saveStatus) {
@@ -278,10 +295,12 @@ export function initNotes(lessonId: number, courseId: number) {
   };
 
   let notesTimeout: any;
-  notesArea?.addEventListener('input', () => {
-    clearTimeout(notesTimeout);
-    notesTimeout = setTimeout(saveNotes, 30000);
-  });
+  if (notesArea) {
+    notesArea.addEventListener('input', () => {
+      clearTimeout(notesTimeout);
+      notesTimeout = setTimeout(saveNotes, 30000);
+    });
+  }
 
   const btn = document.getElementById('saveNotesBtn');
   if (btn) {

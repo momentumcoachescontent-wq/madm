@@ -1280,7 +1280,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
                   ${quizId},
                   ${course.id},
                   ${quiz.time_limit || 0},
-                  '${courseSlug}'
+                  ${JSON.stringify(courseSlug)}
                 );
               }
             });
