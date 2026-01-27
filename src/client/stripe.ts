@@ -1,0 +1,196 @@
+interface CheckoutOptions {
+  stripeKey: string;
+  paypalClientId: string;
+  courseId: number;
+  currency: string;
+  price: number;
+}
+
+export function initCheckout(options: CheckoutOptions) {
+  const { stripeKey, paypalClientId, courseId, currency } = options;
+
+  // Initialize Stripe
+  if (typeof (window as any).Stripe === 'undefined') {
+    console.error('Stripe.js not loaded');
+    return;
+  }
+
+  const stripe = (window as any).Stripe(stripeKey);
+  const elements = stripe.elements();
+  const cardElement = elements.create('card', {
+    style: {
+      base: {
+        fontSize: '16px',
+        color: '#1e293b',
+        '::placeholder': { color: '#94a3b8' }
+      }
+    }
+  });
+
+  const cardElementContainer = document.getElementById('card-element');
+  if (cardElementContainer) {
+    cardElement.mount('#card-element');
+  }
+
+  // Handle card errors
+  cardElement.on('change', (event: any) => {
+    const displayError = document.getElementById('card-errors');
+    if (displayError) {
+      displayError.textContent = event.error ? event.error.message : '';
+    }
+  });
+
+  // Payment Method Selection
+  (window as any).selectPaymentMethod = function(method: 'stripe' | 'paypal') {
+    const stripeBtn = document.getElementById('select-stripe');
+    const paypalBtn = document.getElementById('select-paypal');
+    const stripeDiv = document.getElementById('stripe-payment');
+    const paypalDiv = document.getElementById('paypal-payment');
+
+    if (method === 'stripe') {
+      stripeBtn?.classList.add('active');
+      if (stripeBtn) stripeBtn.style.borderColor = '#8b5cf6';
+
+      paypalBtn?.classList.remove('active');
+      if (paypalBtn) paypalBtn.style.borderColor = '#e2e8f0';
+
+      if (stripeDiv) stripeDiv.style.display = 'block';
+      if (paypalDiv) paypalDiv.style.display = 'none';
+    } else {
+      paypalBtn?.classList.add('active');
+      if (paypalBtn) paypalBtn.style.borderColor = '#8b5cf6';
+
+      stripeBtn?.classList.remove('active');
+      if (stripeBtn) stripeBtn.style.borderColor = '#e2e8f0';
+
+      if (paypalDiv) paypalDiv.style.display = 'block';
+      if (stripeDiv) stripeDiv.style.display = 'none';
+
+      loadPayPalButton(paypalClientId, currency, courseId);
+    }
+  };
+
+  // Handle Stripe Form Submission
+  const form = document.getElementById('payment-form');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const submitButton = document.getElementById('submit-stripe') as HTMLButtonElement;
+      const messageDiv = document.getElementById('checkout-message');
+      const originalText = submitButton.innerHTML;
+      const cardHolderNameInput = document.getElementById('card-holder-name') as HTMLInputElement;
+
+      submitButton.disabled = true;
+      submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+      if (messageDiv) messageDiv.style.display = 'none';
+
+      try {
+        // Create Payment Intent
+        const response = await fetch('/api/create-payment-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            courseId: courseId,
+            paymentMethod: 'stripe'
+          })
+        });
+
+        const { clientSecret, error } = await response.json();
+
+        if (error) {
+          throw new Error(error);
+        }
+
+        // Confirm Payment
+        const result = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: cardElement,
+            billing_details: {
+              name: cardHolderNameInput.value
+            }
+          }
+        });
+
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
+        // Verify Payment on Server
+        const verifyResponse = await fetch('/api/verify-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentIntentId: result.paymentIntent.id,
+            courseId: courseId
+          })
+        });
+
+        const verifyData = await verifyResponse.json();
+
+        if (verifyData.success) {
+          window.location.href = `/pago-exitoso?courseId=${courseId}`;
+        } else {
+          throw new Error('Error al verificar el pago');
+        }
+
+      } catch (error: any) {
+        if (messageDiv) {
+          messageDiv.className = 'auth-message error';
+          messageDiv.textContent = error.message;
+          messageDiv.style.display = 'block';
+        }
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalText;
+      }
+    });
+  }
+}
+
+function loadPayPalButton(clientId: string, currency: string, courseId: number) {
+  if ((window as any).paypalLoaded) return;
+
+  const script = document.createElement('script');
+  script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}`;
+  script.onload = () => {
+    (window as any).paypalLoaded = true;
+
+    if (typeof (window as any).paypal === 'undefined') return;
+
+    (window as any).paypal.Buttons({
+      createOrder: async () => {
+        const response = await fetch('/api/create-paypal-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ courseId: courseId })
+        });
+        const data = await response.json();
+        return data.orderId;
+      },
+      onApprove: async (data: any) => {
+        const response = await fetch('/api/capture-paypal-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: data.orderID,
+            courseId: courseId
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          window.location.href = `/pago-exitoso?courseId=${courseId}`;
+        }
+      },
+      onError: (err: any) => {
+        console.error(err);
+        const messageDiv = document.getElementById('checkout-message');
+        if (messageDiv) {
+          messageDiv.className = 'auth-message error';
+          messageDiv.textContent = 'Error al procesar el pago con PayPal';
+          messageDiv.style.display = 'block';
+        }
+      }
+    }).render('#paypal-button-container');
+  };
+  document.head.appendChild(script);
+}

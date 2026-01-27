@@ -161,46 +161,7 @@ export const renderer = jsxRenderer(({ children }) => {
 
         {/* Scripts */}
         <script src="/static/app.js"></script>
-        
-        {/* Auth State Script */}
-        <script dangerouslySetInnerHTML={{__html: `
-          (async function checkAuth() {
-            function remove(id) {
-              var el = document.getElementById(id);
-              if (el) el.remove();
-            }
-            function show(id, display) {
-              var el = document.getElementById(id);
-              if (el) el.style.display = display || 'inline-flex';
-            }
-
-            try {
-              const response = await fetch('/api/me');
-              const data = await response.json();
-              
-              if (data.success && data.user) {
-                remove('login-link');
-                remove('start-link');
-                show('dashboard-link');
-
-                if (data.user.role === 'admin') {
-                  var adminLink = document.getElementById('admin-link');
-                  if (adminLink) adminLink.style.display = '';
-                } else {
-                  remove('admin-link');
-                }
-              } else {
-                remove('dashboard-link');
-                remove('admin-link');
-                show('login-link');
-              }
-            } catch (error) {
-              remove('dashboard-link');
-              remove('admin-link');
-              show('login-link');
-            }
-          })();
-        `}} />
+        <script src="/static/client.js"></script>
       </body>
     </html>
   )

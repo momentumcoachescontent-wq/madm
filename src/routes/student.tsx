@@ -71,7 +71,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
                   <a href="/cursos" className="btn btn-primary">
                     <i className="fas fa-plus"></i> Explorar Cursos
                   </a>
-                  <button onclick="logout()" className="btn btn-secondary" style="margin-left: 10px;">
+                  <button id="logoutBtn" className="btn btn-secondary" style="margin-left: 10px;">
                     <i className="fas fa-sign-out-alt"></i> Cerrar Sesión
                   </button>
                 </div>
@@ -202,21 +202,6 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
             </section>
           )}
 
-          <script dangerouslySetInnerHTML={{__html: `
-            async function logout() {
-              if (!confirm('¿Estás seguro que deseas cerrar sesión?')) return;
-
-              try {
-                const response = await fetch('/api/logout', { method: 'POST' });
-                if (response.ok) {
-                  window.location.href = '/';
-                }
-              } catch (error) {
-                console.error('Error al cerrar sesión:', error);
-                alert('Error al cerrar sesión. Por favor, intenta de nuevo.');
-              }
-            }
-          `}} />
         </div>
       )
     } catch (error) {
@@ -596,7 +581,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
                       className="notes-area"
                       placeholder="Escribe tus notas sobre esta lección..."
                     >{progress?.notes || ''}</textarea>
-                    <button onclick="saveNotes()" className="btn btn-primary" style="margin-top: 15px;">
+                    <button id="saveNotesBtn" className="btn btn-primary" style="margin-top: 15px;">
                       <i className="fas fa-save"></i> Guardar Notas
                     </button>
                     <span id="saveStatus" style="margin-left: 15px; color: #10b981; display: none;">
@@ -674,313 +659,23 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
           </div>
 
           <script dangerouslySetInnerHTML={{__html: `
-            let isCompleted = ${progress?.completed ? 'true' : 'false'};
-            const lessonId = ${lessonId};
-            const courseId = ${course.id};
-
-            async function toggleComplete() {
-              try {
-                const btn = document.getElementById('completeBtn');
-                btn.disabled = true;
-
-                const response = await fetch('/api/lessons/${lessonId}/complete', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ completed: !isCompleted, courseId })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                  isCompleted = !isCompleted;
-                  btn.innerHTML = isCompleted
-                    ? '<i class="fas fa-check-circle"></i> Completada'
-                    : '<i class="far fa-circle"></i> Marcar Completa';
-                  btn.style.background = isCompleted ? '#10b981' : '#64748b';
-
-                  // Mostrar notificación de certificado
-                  if (data.certificateGenerated && data.certificateId) {
-                    if (confirm('¡Felicitaciones! Has completado el curso al 100%. Tu certificado ha sido generado. ¿Deseas verlo ahora?')) {
-                      window.location.href = '/certificado/' + data.certificateId;
-                      return;
-                    }
-                  }
-
-                  // Reload page to update sidebar
-                  setTimeout(() => window.location.reload(), 500);
-                } else {
-                  alert('Error al actualizar el progreso');
-                }
-              } catch (error) {
-                console.error('Error:', error);
-                alert('Error al actualizar el progreso');
-              } finally {
-                document.getElementById('completeBtn').disabled = false;
-              }
-            }
-
-            async function saveNotes() {
-              try {
-                const notes = document.getElementById('notesArea').value;
-                const saveStatus = document.getElementById('saveStatus');
-
-                const response = await fetch('/api/lessons/${lessonId}/notes', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ notes, courseId })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                  saveStatus.style.display = 'inline';
-                  setTimeout(() => saveStatus.style.display = 'none', 3000);
-                } else {
-                  alert('Error al guardar notas');
-                }
-              } catch (error) {
-                console.error('Error:', error);
-                alert('Error al guardar notas');
-              }
-            }
-
-            // Auto-save notes every 30 seconds
-            let notesTimeout;
-            document.getElementById('notesArea').addEventListener('input', () => {
-              clearTimeout(notesTimeout);
-              notesTimeout = setTimeout(saveNotes, 30000);
-            });
-
-            // ===== VIDEO PROGRESS TRACKING =====
-
-            const lastPosition = ${progress?.last_position || 0};
-            const videoDuration = ${lesson.video_duration || 0};
-            let videoProgressInterval;
-            let currentVideoTime = 0;
-            let currentVideoDuration = 0;
-            let videoReady = false;
-
-            // Function to save video progress
-            async function saveVideoProgress(position, duration) {
-              try {
-                await fetch('/api/lessons/${lessonId}/progress', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    position: Math.round(position),
-                    duration: Math.round(duration),
-                    courseId
-                  })
-                });
-              } catch (error) {
-                console.error('Error saving video progress:', error);
-              }
-            }
-
-            // YouTube IFrame API
-            function initYouTubeTracking() {
-              const iframe = document.querySelector('iframe');
-              if (!iframe || !iframe.src.includes('youtube.com')) return;
-
-              // Load YouTube IFrame API
-              if (!window.YT) {
-                const tag = document.createElement('script');
-                tag.src = 'https://www.youtube.com/iframe_api';
-                const firstScriptTag = document.getElementsByTagName('script')[0];
-                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-              }
-
-              // Initialize player when API is ready
-              window.onYouTubeIframeAPIReady = function() {
-                const player = new YT.Player(iframe, {
-                  events: {
-                    'onReady': function(event) {
-                      videoReady = true;
-                      currentVideoDuration = event.target.getDuration();
-
-                      // Restore last position if exists
-                      if (lastPosition > 0 && lastPosition < currentVideoDuration - 5) {
-                        event.target.seekTo(lastPosition, true);
-                        console.log('Restored video position:', lastPosition);
-                      }
-
-                      // Start tracking every 10 seconds
-                      videoProgressInterval = setInterval(() => {
-                        try {
-                          const currentTime = event.target.getCurrentTime();
-                          const duration = event.target.getDuration();
-
-                          if (currentTime > 0 && duration > 0) {
-                            currentVideoTime = currentTime;
-                            currentVideoDuration = duration;
-                            saveVideoProgress(currentTime, duration);
-                          }
-                        } catch (err) {
-                          console.error('Error tracking YouTube progress:', err);
-                        }
-                      }, 10000);
-                    },
-                    'onStateChange': function(event) {
-                      // Save on pause or end
-                      if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
-                        try {
-                          const currentTime = event.target.getCurrentTime();
-                          const duration = event.target.getDuration();
-                          if (currentTime > 0 && duration > 0) {
-                            saveVideoProgress(currentTime, duration);
-                          }
-                        } catch (err) {
-                          console.error('Error saving on pause:', err);
-                        }
-                      }
-
-                      // Auto-complete when video ends
-                      if (event.data === YT.PlayerState.ENDED && !isCompleted) {
-                        setTimeout(toggleComplete, 1000);
-                      }
-                    }
-                  }
-                });
-              };
-
-              // If API already loaded
-              if (window.YT && window.YT.Player) {
-                window.onYouTubeIframeAPIReady();
-              }
-            }
-
-            // Vimeo Player API
-            function initVimeoTracking() {
-              const iframe = document.querySelector('iframe');
-              if (!iframe || !iframe.src.includes('vimeo.com')) return;
-
-              // Load Vimeo Player API
-              if (!window.Vimeo) {
-                const script = document.createElement('script');
-                script.src = 'https://player.vimeo.com/api/player.js';
-                script.onload = setupVimeoPlayer;
-                document.head.appendChild(script);
-              } else {
-                setupVimeoPlayer();
-              }
-
-              function setupVimeoPlayer() {
-                const player = new Vimeo.Player(iframe);
-
-                player.ready().then(() => {
-                  videoReady = true;
-
-                  player.getDuration().then(duration => {
-                    currentVideoDuration = duration;
-
-                    // Restore last position
-                    if (lastPosition > 0 && lastPosition < duration - 5) {
-                      player.setCurrentTime(lastPosition).then(() => {
-                        console.log('Restored video position:', lastPosition);
-                      });
-                    }
-                  });
-
-                  // Track current time
-                  player.on('timeupdate', data => {
-                    currentVideoTime = data.seconds;
-                    currentVideoDuration = data.duration;
-                  });
-
-                  // Start auto-save every 10 seconds
-                  videoProgressInterval = setInterval(() => {
-                    if (currentVideoTime > 0 && currentVideoDuration > 0) {
-                      saveVideoProgress(currentVideoTime, currentVideoDuration);
-                    }
-                  }, 10000);
-
-                  // Save on pause
-                  player.on('pause', () => {
-                    if (currentVideoTime > 0) {
-                      saveVideoProgress(currentVideoTime, currentVideoDuration);
-                    }
-                  });
-
-                  // Save and auto-complete on end
-                  player.on('ended', () => {
-                    saveVideoProgress(currentVideoTime, currentVideoDuration);
-                    if (!isCompleted) {
-                      setTimeout(toggleComplete, 1000);
-                    }
-                  });
-                });
-              }
-            }
-
-            // Generic HTML5 Video tracking (for self-hosted videos)
-            function initHTML5VideoTracking() {
-              const video = document.querySelector('video');
-              if (!video) return;
-
-              video.addEventListener('loadedmetadata', () => {
-                videoReady = true;
-                currentVideoDuration = video.duration;
-
-                // Restore position
-                if (lastPosition > 0 && lastPosition < video.duration - 5) {
-                  video.currentTime = lastPosition;
-                  console.log('Restored video position:', lastPosition);
-                }
-              });
-
-              // Track time updates
-              video.addEventListener('timeupdate', () => {
-                currentVideoTime = video.currentTime;
-                currentVideoDuration = video.duration;
-              });
-
-              // Auto-save every 10 seconds
-              videoProgressInterval = setInterval(() => {
-                if (video.currentTime > 0 && video.duration > 0) {
-                  saveVideoProgress(video.currentTime, video.duration);
-                }
-              }, 10000);
-
-              // Save on pause
-              video.addEventListener('pause', () => {
-                if (video.currentTime > 0) {
-                  saveVideoProgress(video.currentTime, video.duration);
-                }
-              });
-
-              // Save and auto-complete on end
-              video.addEventListener('ended', () => {
-                saveVideoProgress(video.currentTime, video.duration);
-                if (!isCompleted) {
-                  setTimeout(toggleComplete, 1000);
-                }
-              });
-            }
-
-            // Initialize appropriate tracking
-            setTimeout(() => {
-              initYouTubeTracking();
-              initVimeoTracking();
-              initHTML5VideoTracking();
-            }, 1000);
-
-            // Save progress before leaving page
-            window.addEventListener('beforeunload', () => {
-              if (currentVideoTime > 0 && currentVideoDuration > 0) {
-                // Use sendBeacon for reliable saving on page unload
-                const data = JSON.stringify({
-                  position: Math.round(currentVideoTime),
-                  duration: Math.round(currentVideoDuration),
-                  courseId
-                });
-                navigator.sendBeacon('/api/lessons/${lessonId}/progress', data);
-              }
-            });
-
-            // Clear interval on page unload
-            window.addEventListener('unload', () => {
-              if (videoProgressInterval) {
-                clearInterval(videoProgressInterval);
+            document.addEventListener('DOMContentLoaded', () => {
+              if (window.ADM && window.ADM.video) {
+                window.ADM.video.initVideoTracking(
+                  ${lessonId},
+                  ${course.id},
+                  ${progress?.last_position || 0},
+                  ${lesson.video_duration || 0}
+                );
+                window.ADM.video.initCompletion(
+                  ${lessonId},
+                  ${course.id},
+                  ${progress?.completed ? 'true' : 'false'}
+                );
+                window.ADM.video.initNotes(
+                  ${lessonId},
+                  ${course.id}
+                );
               }
             });
           `}} />
@@ -1185,7 +880,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
             <a href="/mi-aprendizaje" className="btn btn-secondary btn-lg" style="margin-left: 15px;">
               <i className="fas fa-arrow-left"></i> Volver a Mis Cursos
             </a>
-            <button onclick="downloadPDF()" className="btn btn-secondary btn-lg" style="margin-left: 15px;">
+            <button id="downloadPdfBtn" className="btn btn-secondary btn-lg" style="margin-left: 15px;">
               <i className="fas fa-download"></i> Descargar PDF
             </button>
           </div>
@@ -1254,14 +949,6 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
             </div>
           </div>
 
-          <script dangerouslySetInnerHTML={{__html: `
-            function downloadPDF() {
-              // En producción, esto llamaría a una API para generar PDF
-              // Por ahora, simplemente imprime
-              alert('Usa el botón de imprimir y selecciona "Guardar como PDF" en tu navegador.');
-              window.print();
-            }
-          `}} />
         </div>
       )
     } catch (error) {
@@ -1587,109 +1274,15 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
           </div>
 
           <script dangerouslySetInnerHTML={{__html: `
-            const quizId = ${quizId};
-            const courseId = ${course.id};
-            const timeLimit = ${quiz.time_limit || 0};
-            let timeRemaining = timeLimit * 60; // segundos
-            let timerInterval;
-            let startTime = Date.now();
-
-            // Iniciar timer si hay límite de tiempo
-            if (timeLimit > 0) {
-              timerInterval = setInterval(() => {
-                timeRemaining--;
-
-                const minutes = Math.floor(timeRemaining / 60);
-                const seconds = timeRemaining % 60;
-                const display = minutes + ':' + seconds.toString().padStart(2, '0');
-
-                const timerEl = document.getElementById('timerDisplay');
-                timerEl.textContent = display;
-
-                // Cambiar colores según tiempo restante
-                timerEl.classList.remove('warning', 'danger');
-                if (timeRemaining <= 60) {
-                  timerEl.classList.add('danger');
-                } else if (timeRemaining <= 180) {
-                  timerEl.classList.add('warning');
-                }
-
-                // Auto-submit cuando se acaba el tiempo
-                if (timeRemaining <= 0) {
-                  clearInterval(timerInterval);
-                  alert('¡Tiempo agotado! La evaluación se enviará automáticamente.');
-                  document.getElementById('quizForm').dispatchEvent(new Event('submit'));
-                }
-              }, 1000);
-            }
-
-            // Manejar envío del formulario
-            document.getElementById('quizForm').addEventListener('submit', async (e) => {
-              e.preventDefault();
-
-              if (timerInterval) clearInterval(timerInterval);
-
-              if (!confirm('¿Estás seguro de enviar la evaluación? No podrás cambiar tus respuestas.')) {
-                if (timerInterval && timeRemaining > 0) {
-                  timerInterval = setInterval(() => { /* reiniciar timer */ }, 1000);
-                }
-                return;
+            document.addEventListener('DOMContentLoaded', () => {
+              if (window.ADM && window.ADM.quiz) {
+                window.ADM.quiz.initQuiz(
+                  ${quizId},
+                  ${course.id},
+                  ${quiz.time_limit || 0},
+                  '${courseSlug}'
+                );
               }
-
-              const formData = new FormData(e.target);
-              const answers = {};
-
-              // Recopilar respuestas
-              for (let [key, value] of formData.entries()) {
-                if (key.startsWith('question_')) {
-                  const questionId = key.replace('question_', '');
-                  if (!answers[questionId]) {
-                    answers[questionId] = [];
-                  }
-                  answers[questionId].push(parseInt(value));
-                }
-              }
-
-              const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-
-              try {
-                const submitBtn = e.target.querySelector('button[type="submit"]');
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-
-                const response = await fetch('/api/quiz/submit', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    quizId,
-                    courseId,
-                    answers,
-                    timeTaken
-                  })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                  window.location.href = '/cursos/${courseSlug}/quiz/' + quizId + '/resultado/' + data.attemptId;
-                } else {
-                  alert('Error: ' + (data.error || 'No se pudo enviar la evaluación'));
-                  submitBtn.disabled = false;
-                  submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Enviar Evaluación';
-                }
-              } catch (error) {
-                console.error('Error:', error);
-                alert('Error al enviar la evaluación. Por favor, intenta de nuevo.');
-                const submitBtn = e.target.querySelector('button[type="submit"]');
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Enviar Evaluación';
-              }
-            });
-
-            // Prevenir salida accidental
-            window.addEventListener('beforeunload', (e) => {
-              e.preventDefault();
-              e.returnValue = '';
             });
           `}} />
         </div>
@@ -2178,167 +1771,17 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
 
           <script src="https://js.stripe.com/v3/"></script>
           <script dangerouslySetInnerHTML={{__html: `
-            const stripe = Stripe('${c.env.STRIPE_PUBLISHABLE_KEY}');
-            const elements = stripe.elements();
-            const cardElement = elements.create('card', {
-              style: {
-                base: {
-                  fontSize: '16px',
-                  color: '#1e293b',
-                  '::placeholder': { color: '#94a3b8' }
-                }
+            document.addEventListener('DOMContentLoaded', () => {
+              if (window.ADM && window.ADM.stripe) {
+                window.ADM.stripe.initCheckout({
+                  stripeKey: '${c.env.STRIPE_PUBLISHABLE_KEY}',
+                  paypalClientId: '${c.env.PAYPAL_CLIENT_ID}',
+                  courseId: ${courseId},
+                  currency: '${course.currency}',
+                  price: ${course.price}
+                });
               }
             });
-            cardElement.mount('#card-element');
-
-            // Manejo de errores de tarjeta
-            cardElement.on('change', (event) => {
-              const displayError = document.getElementById('card-errors');
-              if (event.error) {
-                displayError.textContent = event.error.message;
-              } else {
-                displayError.textContent = '';
-              }
-            });
-
-            // Selector de método de pago
-            function selectPaymentMethod(method) {
-              const stripBtn = document.getElementById('select-stripe');
-              const paypalBtn = document.getElementById('select-paypal');
-              const stripeDiv = document.getElementById('stripe-payment');
-              const paypalDiv = document.getElementById('paypal-payment');
-
-              if (method === 'stripe') {
-                stripBtn.classList.add('active');
-                stripBtn.style.borderColor = '#8b5cf6';
-                paypalBtn.classList.remove('active');
-                paypalBtn.style.borderColor = '#e2e8f0';
-                stripeDiv.style.display = 'block';
-                paypalDiv.style.display = 'none';
-              } else {
-                paypalBtn.classList.add('active');
-                paypalBtn.style.borderColor = '#8b5cf6';
-                stripBtn.classList.remove('active');
-                stripBtn.style.borderColor = '#e2e8f0';
-                paypalDiv.style.display = 'block';
-                stripeDiv.style.display = 'none';
-                loadPayPalButton();
-              }
-            }
-
-            // Formulario de pago con Stripe
-            const form = document.getElementById('payment-form');
-            form.addEventListener('submit', async (e) => {
-              e.preventDefault();
-
-              const submitButton = document.getElementById('submit-stripe');
-              const messageDiv = document.getElementById('checkout-message');
-              const originalText = submitButton.innerHTML;
-
-              submitButton.disabled = true;
-              submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-              messageDiv.style.display = 'none';
-
-              try {
-                // Crear Payment Intent
-                const response = await fetch('/api/create-payment-intent', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    courseId: ${courseId},
-                    paymentMethod: 'stripe'
-                  })
-                });
-
-                const { clientSecret, error } = await response.json();
-
-                if (error) {
-                  throw new Error(error);
-                }
-
-                // Confirmar pago
-                const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-                  payment_method: {
-                    card: cardElement,
-                    billing_details: {
-                      name: document.getElementById('card-holder-name').value
-                    }
-                  }
-                });
-
-                if (stripeError) {
-                  throw new Error(stripeError.message);
-                }
-
-                // Verificar pago en el servidor
-                const verifyResponse = await fetch('/api/verify-payment', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    paymentIntentId: paymentIntent.id,
-                    courseId: ${courseId}
-                  })
-                });
-
-                const verifyData = await verifyResponse.json();
-
-                if (verifyData.success) {
-                  window.location.href = '/pago-exitoso?courseId=${courseId}';
-                } else {
-                  throw new Error('Error al verificar el pago');
-                }
-
-              } catch (error) {
-                messageDiv.className = 'auth-message error';
-                messageDiv.textContent = error.message;
-                messageDiv.style.display = 'block';
-                submitButton.disabled = false;
-                submitButton.innerHTML = originalText;
-              }
-            });
-
-            // PayPal
-            function loadPayPalButton() {
-              if (window.paypalLoaded) return;
-
-              const script = document.createElement('script');
-              script.src = 'https://www.paypal.com/sdk/js?client-id=${c.env.PAYPAL_CLIENT_ID}&currency=${course.currency}';
-              script.onload = () => {
-                window.paypalLoaded = true;
-                paypal.Buttons({
-                  createOrder: async () => {
-                    const response = await fetch('/api/create-paypal-order', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ courseId: ${courseId} })
-                    });
-                    const data = await response.json();
-                    return data.orderId;
-                  },
-                  onApprove: async (data) => {
-                    const response = await fetch('/api/capture-paypal-order', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        orderId: data.orderID,
-                        courseId: ${courseId}
-                      })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                      window.location.href = '/pago-exitoso?courseId=${courseId}';
-                    }
-                  },
-                  onError: (err) => {
-                    const messageDiv = document.getElementById('checkout-message');
-                    messageDiv.className = 'auth-message error';
-                    messageDiv.textContent = 'Error al procesar el pago con PayPal';
-                    messageDiv.style.display = 'block';
-                  }
-                }).render('#paypal-button-container');
-              };
-              document.head.appendChild(script);
-            }
           `}} />
         </div>
       )
