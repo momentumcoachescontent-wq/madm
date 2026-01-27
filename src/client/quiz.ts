@@ -6,35 +6,39 @@ export function initQuiz(quizId: number, courseId: number, timeLimit: number, sl
 
   if (!form) return;
 
+  // Tick function
+  const tick = () => {
+    timeRemaining--;
+
+    const minutes = Math.floor(timeRemaining / 60);
+    const seconds = timeRemaining % 60;
+    const display = minutes + ':' + seconds.toString().padStart(2, '0');
+
+    const timerEl = document.getElementById('timerDisplay');
+    if (timerEl) {
+      timerEl.textContent = display;
+
+      // Change colors based on remaining time
+      timerEl.classList.remove('warning', 'danger');
+      if (timeRemaining <= 60) {
+        timerEl.classList.add('danger');
+      } else if (timeRemaining <= 180) {
+        timerEl.classList.add('warning');
+      }
+    }
+
+    // Auto-submit when time runs out
+    if (timeRemaining <= 0) {
+      if (timerInterval) clearInterval(timerInterval);
+      alert('¡Tiempo agotado! La evaluación se enviará automáticamente.');
+      form.dispatchEvent(new Event('submit'));
+    }
+  };
+
   // Start timer if time limit exists
   if (timeLimit > 0) {
-    timerInterval = setInterval(() => {
-      timeRemaining--;
-
-      const minutes = Math.floor(timeRemaining / 60);
-      const seconds = timeRemaining % 60;
-      const display = minutes + ':' + seconds.toString().padStart(2, '0');
-
-      const timerEl = document.getElementById('timerDisplay');
-      if (timerEl) {
-        timerEl.textContent = display;
-
-        // Change colors based on remaining time
-        timerEl.classList.remove('warning', 'danger');
-        if (timeRemaining <= 60) {
-          timerEl.classList.add('danger');
-        } else if (timeRemaining <= 180) {
-          timerEl.classList.add('warning');
-        }
-      }
-
-      // Auto-submit when time runs out
-      if (timeRemaining <= 0) {
-        if (timerInterval) clearInterval(timerInterval);
-        alert('¡Tiempo agotado! La evaluación se enviará automáticamente.');
-        form.dispatchEvent(new Event('submit'));
-      }
-    }, 1000);
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(tick, 1000);
   }
 
   // Handle form submission
@@ -45,13 +49,10 @@ export function initQuiz(quizId: number, courseId: number, timeLimit: number, sl
 
     // If triggered manually (not by timeout), ask for confirmation
     if (timeRemaining > 0 && !confirm('¿Estás seguro de enviar la evaluación? No podrás cambiar tus respuestas.')) {
-      if (timerInterval) {
-        // Restart timer if cancelled
-        timerInterval = setInterval(() => {
-           timeRemaining--;
-           // ... (duplicate logic for simple restart, or just accept drift)
-           // ideally we should extract the tick function but for now this is fine or we can just not clear interval until confirmed
-        }, 1000);
+      // Restart timer if cancelled
+      if (timeLimit > 0) {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(tick, 1000);
       }
       return;
     }
@@ -90,7 +91,7 @@ export function initQuiz(quizId: number, courseId: number, timeLimit: number, sl
         })
       });
 
-      const data = await response.json();
+      const data = await response.json() as any;
 
       if (data.success) {
         window.location.href = `/cursos/${slug}/quiz/${quizId}/resultado/${data.attemptId}`;

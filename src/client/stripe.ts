@@ -78,8 +78,14 @@ export function initCheckout(options: CheckoutOptions) {
 
       const submitButton = document.getElementById('submit-stripe') as HTMLButtonElement;
       const messageDiv = document.getElementById('checkout-message');
-      const originalText = submitButton.innerHTML;
       const cardHolderNameInput = document.getElementById('card-holder-name') as HTMLInputElement;
+
+      if (!submitButton || !cardHolderNameInput) {
+        console.error('Missing required elements for payment processing');
+        return;
+      }
+
+      const originalText = submitButton.innerHTML;
 
       submitButton.disabled = true;
       submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
@@ -96,7 +102,7 @@ export function initCheckout(options: CheckoutOptions) {
           })
         });
 
-        const { clientSecret, error } = await response.json();
+        const { clientSecret, error } = await response.json() as any;
 
         if (error) {
           throw new Error(error);
@@ -126,7 +132,7 @@ export function initCheckout(options: CheckoutOptions) {
           })
         });
 
-        const verifyData = await verifyResponse.json();
+        const verifyData = await verifyResponse.json() as any;
 
         if (verifyData.success) {
           window.location.href = `/pago-exitoso?courseId=${courseId}`;
@@ -159,26 +165,56 @@ function loadPayPalButton(clientId: string, currency: string, courseId: number) 
 
     (window as any).paypal.Buttons({
       createOrder: async () => {
-        const response = await fetch('/api/create-paypal-order', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ courseId: courseId })
-        });
-        const data = await response.json();
-        return data.orderId;
+        try {
+          const response = await fetch('/api/create-paypal-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ courseId: courseId })
+          });
+
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+
+          const data = await response.json() as any;
+          if (!data.orderId) {
+             throw new Error('No order ID received');
+          }
+          return data.orderId;
+        } catch (error) {
+          console.error('Error creating PayPal order:', error);
+          throw error;
+        }
       },
       onApprove: async (data: any) => {
-        const response = await fetch('/api/capture-paypal-order', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId: data.orderID,
-            courseId: courseId
-          })
-        });
-        const result = await response.json();
-        if (result.success) {
-          window.location.href = `/pago-exitoso?courseId=${courseId}`;
+        try {
+          const response = await fetch('/api/capture-paypal-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: data.orderID,
+              courseId: courseId
+            })
+          });
+
+          if (!response.ok) {
+             throw new Error('Network response was not ok');
+          }
+
+          const result = await response.json() as any;
+          if (result.success) {
+            window.location.href = `/pago-exitoso?courseId=${courseId}`;
+          } else {
+             throw new Error(result.error || 'Payment capture failed');
+          }
+        } catch (error: any) {
+          console.error('Error capturing PayPal order:', error);
+          const messageDiv = document.getElementById('checkout-message');
+          if (messageDiv) {
+            messageDiv.className = 'auth-message error';
+            messageDiv.textContent = error.message || 'Error al procesar el pago con PayPal';
+            messageDiv.style.display = 'block';
+          }
         }
       },
       onError: (err: any) => {
