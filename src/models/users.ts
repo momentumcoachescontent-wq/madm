@@ -85,7 +85,7 @@ export function generateSessionToken(): string {
 export const getUserFromSession = async (db: D1Database, sessionToken: string): Promise<User | null> => {
   const session = await dbFirst<any>(
     db,
-    `SELECT s.*, u.id as user_id, u.email, u.name, u.avatar_url, u.role, u.active
+    `SELECT s.*, u.id as user_id, u.email, u.name, u.avatar_url, u.role, u.active, u.password_hash, u.email_verified, u.created_at
      FROM user_sessions s
      JOIN users u ON s.user_id = u.id
      WHERE s.session_token = ?
@@ -103,10 +103,9 @@ export const getUserFromSession = async (db: D1Database, sessionToken: string): 
     avatar_url: session.avatar_url,
     role: session.role,
     active: session.active,
-    // These fields might not be needed for session user but satisfying User interface
-    password_hash: '',
-    email_verified: 1, // Assumed if active
-    created_at: ''
+    password_hash: session.password_hash,
+    email_verified: session.email_verified,
+    created_at: session.created_at
   } as User
 }
 
@@ -118,11 +117,14 @@ export const createSession = async (db: D1Database, userId: number): Promise<str
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + 30) // 30 days
 
+  // Format to SQLite datetime: YYYY-MM-DD HH:MM:SS
+  const expiresAtStr = expiresAt.toISOString().replace('T', ' ').substring(0, 19)
+
   await dbRun(
     db,
     `INSERT INTO user_sessions (user_id, session_token, expires_at)
      VALUES (?, ?, ?)`,
-    [userId, token, expiresAt.toISOString()]
+    [userId, token, expiresAtStr]
   )
 
   return token

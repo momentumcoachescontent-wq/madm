@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { html } from 'hono/html'
 import { AdminLayout } from './layout'
+import { listLessons, getLessonById, createLesson, updateLesson } from '../models/lessons'
+import { listCourses } from '../models/courses'
 
 type Bindings = {
   DB: D1Database
@@ -128,7 +130,6 @@ const LessonListHelper = (lessons: any[]) => html`
 
 // List
 app.get('/', async (c) => {
-  const { listLessons } = await import('../models/lessons')
   const lessons = await listLessons(c.env.DB)
 
   return c.html(AdminLayout({
@@ -141,7 +142,6 @@ app.get('/', async (c) => {
 
 // New
 app.get('/new', async (c) => {
-  const { listCourses } = await import('../models/courses')
   const courses = await listCourses(c.env.DB)
   // listCourses returns full objects, but that's fine for the form helper
   return c.html(AdminLayout({
@@ -154,8 +154,6 @@ app.get('/new', async (c) => {
 
 // Edit
 app.get('/:id', async (c) => {
-  const { getLessonById } = await import('../models/lessons')
-  const { listCourses } = await import('../models/courses')
   const id = c.req.param('id')
   const lesson = await getLessonById(c.env.DB, parseInt(id))
   if (!lesson) return c.notFound()
@@ -172,10 +170,12 @@ app.get('/:id', async (c) => {
 
 // Create Action
 app.post('/', async (c) => {
-  const { createLesson } = await import('../models/lessons')
   const body = await c.req.parseBody()
 
   try {
+    let videoDuration = parseInt(String(body.video_duration || '0'), 10)
+    if (isNaN(videoDuration)) videoDuration = 0
+
     await createLesson(c.env.DB, {
       course_id: parseInt(body.course_id as string),
       module_number: parseInt(body.module_number as string),
@@ -183,7 +183,7 @@ app.post('/', async (c) => {
       title: body.title as string,
       description: body.description as string,
       video_url: body.video_url as string,
-      video_duration: parseInt(body.video_duration as string || '0'),
+      video_duration: videoDuration,
       content: body.content as string,
       is_preview: body.is_preview ? 1 : 0,
       published: body.published ? 1 : 0
@@ -197,11 +197,13 @@ app.post('/', async (c) => {
 
 // Update Action
 app.post('/:id', async (c) => {
-  const { updateLesson } = await import('../models/lessons')
   const id = c.req.param('id')
   const body = await c.req.parseBody()
 
   try {
+    let videoDuration = parseInt(String(body.video_duration || '0'), 10)
+    if (isNaN(videoDuration)) videoDuration = 0
+
     await updateLesson(c.env.DB, parseInt(id), {
       course_id: parseInt(body.course_id as string),
       module_number: parseInt(body.module_number as string),
@@ -209,7 +211,7 @@ app.post('/:id', async (c) => {
       title: body.title as string,
       description: body.description as string,
       video_url: body.video_url as string,
-      video_duration: parseInt(body.video_duration as string || '0'),
+      video_duration: videoDuration,
       content: body.content as string,
       is_preview: body.is_preview ? 1 : 0,
       published: body.published ? 1 : 0
