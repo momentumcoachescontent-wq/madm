@@ -179,3 +179,10 @@ export const incrementBlogPostViews = async (db: D1Database, id: number) => {
 export const deleteBlogPost = async (db: D1Database, id: number) => {
   return await dbRun(db, 'DELETE FROM blog_posts WHERE id = ?', [id])
 }
+
+/**
+ * Delete blog post versions
+ */
+export const deleteBlogPostVersion = async (db: D1Database, postId: number, status: string) => {
+  return await dbRun(db, 'DELETE FROM blog_post_versions WHERE post_id = ? AND status = ?', [postId, status])
+}

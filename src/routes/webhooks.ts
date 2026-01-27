@@ -175,11 +175,7 @@ export function registerWebhookRoutes(app: Hono<{ Bindings: CloudflareBindings }
           // Marcar inscripción como en disputa (opcional)
           const paymentIntentId = dispute.payment_intent
           if (paymentIntentId) {
-            await c.env.DB.prepare(`
-              UPDATE paid_enrollments
-              SET payment_status = 'disputed', updated_at = CURRENT_TIMESTAMP
-              WHERE payment_id = ? AND payment_method = 'stripe'
-            `).bind(paymentIntentId).run()
+            await updateEnrollmentStatus(c.env.DB, paymentIntentId as string, 'disputed', 'stripe')
           }
 
           await logWebhook(c.env.DB, 'stripe', event.type, event.id, dispute, 'processed')
@@ -272,11 +268,8 @@ export function registerWebhookRoutes(app: Hono<{ Bindings: CloudflareBindings }
 
           if (!enrollment) {
             // Puede que ya se haya creado en el flujo normal, buscar por cualquier order ID relacionado
-            enrollment = await c.env.DB.prepare(`
-              SELECT * FROM paid_enrollments
-              WHERE user_id = ? AND course_id = ? AND payment_method = 'paypal'
-              ORDER BY created_at DESC LIMIT 1
-            `).bind(courseData.userId, courseData.courseId).first<any>()
+            const { getLatestEnrollment } = await import('../models/enrollments')
+            enrollment = await getLatestEnrollment(c.env.DB, courseData.userId, courseData.courseId, 'paypal')
           }
 
           if (enrollment) {
@@ -308,12 +301,8 @@ export function registerWebhookRoutes(app: Hono<{ Bindings: CloudflareBindings }
           console.log('Payment refunded:', captureId)
 
           // Buscar inscripción por metadata
-          const enrollment = await c.env.DB.prepare(`
-            SELECT pe.* FROM paid_enrollments pe
-            JOIN payment_transactions pt ON pe.id = pt.enrollment_id
-            WHERE pt.metadata LIKE ? AND pe.payment_method = 'paypal'
-            LIMIT 1
-          `).bind('%' + captureId + '%').first<any>()
+          const { getEnrollmentByPayPalCaptureId } = await import('../models/enrollments')
+          const enrollment = await getEnrollmentByPayPalCaptureId(c.env.DB, captureId)
 
           if (enrollment) {
             try {

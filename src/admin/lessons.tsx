@@ -128,16 +128,12 @@ const LessonListHelper = (lessons: any[]) => html`
 
 // List
 app.get('/', async (c) => {
-  const lessons = await c.env.DB.prepare(`
-    SELECT l.*, c.title as course_title
-    FROM lessons l
-    JOIN courses c ON l.course_id = c.id
-    ORDER BY c.title ASC, l.module_number ASC, l.lesson_number ASC
-  `).all()
+  const { listLessons } = await import('../models/lessons')
+  const lessons = await listLessons(c.env.DB)
 
   return c.html(AdminLayout({
     title: 'Gestión de Lecciones',
-    children: LessonListHelper(lessons.results || []),
+    children: LessonListHelper(lessons),
     activeItem: 'lessons',
     headerActions: html`<a href="/admin/lessons/new" class="btn btn-primary"><i class="fas fa-plus"></i> Nueva Lección</a>`
   }))
@@ -145,10 +141,12 @@ app.get('/', async (c) => {
 
 // New
 app.get('/new', async (c) => {
-  const courses = await c.env.DB.prepare('SELECT id, title FROM courses ORDER BY title').all()
+  const { listCourses } = await import('../models/courses')
+  const courses = await listCourses(c.env.DB)
+  // listCourses returns full objects, but that's fine for the form helper
   return c.html(AdminLayout({
     title: 'Crear Nueva Lección',
-    children: LessonForm({}, courses.results),
+    children: LessonForm({}, courses),
     activeItem: 'lessons',
     headerActions: html`<a href="/admin/lessons" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Listado</a>`
   }))
@@ -156,15 +154,17 @@ app.get('/new', async (c) => {
 
 // Edit
 app.get('/:id', async (c) => {
+  const { getLessonById } = await import('../models/lessons')
+  const { listCourses } = await import('../models/courses')
   const id = c.req.param('id')
-  const lesson = await c.env.DB.prepare('SELECT * FROM lessons WHERE id = ?').bind(id).first()
+  const lesson = await getLessonById(c.env.DB, parseInt(id))
   if (!lesson) return c.notFound()
 
-  const courses = await c.env.DB.prepare('SELECT id, title FROM courses ORDER BY title').all()
+  const courses = await listCourses(c.env.DB)
 
   return c.html(AdminLayout({
     title: 'Editar Lección',
-    children: LessonForm(lesson, courses.results),
+    children: LessonForm(lesson, courses),
     activeItem: 'lessons',
     headerActions: html`<a href="/admin/lessons" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver al Listado</a>`
   }))
@@ -172,20 +172,22 @@ app.get('/:id', async (c) => {
 
 // Create Action
 app.post('/', async (c) => {
+  const { createLesson } = await import('../models/lessons')
   const body = await c.req.parseBody()
 
   try {
-    await c.env.DB.prepare(`
-      INSERT INTO lessons (
-        course_id, module_number, lesson_number, title, description,
-        video_url, video_duration, content, is_preview, published
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      body.course_id, body.module_number, body.lesson_number, body.title, body.description,
-      body.video_url, body.video_duration, body.content,
-      body.is_preview ? 1 : 0, body.published ? 1 : 0
-    ).run()
+    await createLesson(c.env.DB, {
+      course_id: parseInt(body.course_id as string),
+      module_number: parseInt(body.module_number as string),
+      lesson_number: parseInt(body.lesson_number as string),
+      title: body.title as string,
+      description: body.description as string,
+      video_url: body.video_url as string,
+      video_duration: parseInt(body.video_duration as string || '0'),
+      content: body.content as string,
+      is_preview: body.is_preview ? 1 : 0,
+      published: body.published ? 1 : 0
+    })
 
     return c.redirect('/admin/lessons')
   } catch (error) {
@@ -195,20 +197,23 @@ app.post('/', async (c) => {
 
 // Update Action
 app.post('/:id', async (c) => {
+  const { updateLesson } = await import('../models/lessons')
   const id = c.req.param('id')
   const body = await c.req.parseBody()
 
   try {
-    await c.env.DB.prepare(`
-      UPDATE lessons
-      SET course_id = ?, module_number = ?, lesson_number = ?, title = ?, description = ?,
-          video_url = ?, video_duration = ?, content = ?, is_preview = ?, published = ?
-      WHERE id = ?
-    `).bind(
-      body.course_id, body.module_number, body.lesson_number, body.title, body.description,
-      body.video_url, body.video_duration, body.content,
-      body.is_preview ? 1 : 0, body.published ? 1 : 0, id
-    ).run()
+    await updateLesson(c.env.DB, parseInt(id), {
+      course_id: parseInt(body.course_id as string),
+      module_number: parseInt(body.module_number as string),
+      lesson_number: parseInt(body.lesson_number as string),
+      title: body.title as string,
+      description: body.description as string,
+      video_url: body.video_url as string,
+      video_duration: parseInt(body.video_duration as string || '0'),
+      content: body.content as string,
+      is_preview: body.is_preview ? 1 : 0,
+      published: body.published ? 1 : 0
+    })
 
     return c.redirect('/admin/lessons')
   } catch (error) {

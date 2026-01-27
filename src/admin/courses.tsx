@@ -132,11 +132,12 @@ const CourseListHelper = (courses: any[]) => html`
 
 // List
 app.get('/', async (c) => {
-  const courses = await c.env.DB.prepare('SELECT * FROM courses ORDER BY created_at DESC').all()
+  const { listCourses } = await import('../models/courses')
+  const courses = await listCourses(c.env.DB)
 
   return c.html(AdminLayout({
     title: 'Gestión de Cursos',
-    children: CourseListHelper(courses.results || []),
+    children: CourseListHelper(courses),
     activeItem: 'courses',
     headerActions: html`<a href="/admin/courses/new" class="btn btn-primary"><i class="fas fa-plus"></i> Nuevo Curso</a>`
   }))
@@ -154,8 +155,9 @@ app.get('/new', (c) => {
 
 // Edit
 app.get('/:id', async (c) => {
+  const { getCourseById } = await import('../models/courses')
   const id = c.req.param('id')
-  const course = await c.env.DB.prepare('SELECT * FROM courses WHERE id = ?').bind(id).first()
+  const course = await getCourseById(c.env.DB, parseInt(id))
   if (!course) return c.notFound()
 
   return c.html(AdminLayout({
@@ -168,17 +170,22 @@ app.get('/:id', async (c) => {
 
 // Create Action
 app.post('/', async (c) => {
+  const { createCourse } = await import('../models/courses')
   const body = await c.req.parseBody()
 
   try {
-    await c.env.DB.prepare(`
-      INSERT INTO courses (title, slug, subtitle, description, price, currency, duration_weeks, level, featured_image, published, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `).bind(
-      body.title, body.slug, body.subtitle, body.description,
-      body.price, body.currency, body.duration_weeks, body.level,
-      body.featured_image, body.published ? 1 : 0
-    ).run()
+    await createCourse(c.env.DB, {
+      title: body.title as string,
+      slug: body.slug as string,
+      subtitle: body.subtitle as string,
+      description: body.description as string,
+      price: parseFloat(body.price as string),
+      currency: body.currency as string,
+      duration_weeks: parseInt(body.duration_weeks as string),
+      level: body.level as string,
+      featured_image: body.featured_image as string,
+      published: body.published ? 1 : 0
+    })
 
     return c.redirect('/admin/courses')
   } catch (error) {
@@ -188,19 +195,23 @@ app.post('/', async (c) => {
 
 // Update Action
 app.post('/:id', async (c) => {
+  const { updateCourse } = await import('../models/courses')
   const id = c.req.param('id')
   const body = await c.req.parseBody()
 
   try {
-    await c.env.DB.prepare(`
-      UPDATE courses
-      SET title = ?, slug = ?, subtitle = ?, description = ?, price = ?, currency = ?, duration_weeks = ?, level = ?, featured_image = ?, published = ?
-      WHERE id = ?
-    `).bind(
-      body.title, body.slug, body.subtitle, body.description,
-      body.price, body.currency, body.duration_weeks, body.level,
-      body.featured_image, body.published ? 1 : 0, id
-    ).run()
+    await updateCourse(c.env.DB, parseInt(id), {
+      title: body.title as string,
+      slug: body.slug as string,
+      subtitle: body.subtitle as string,
+      description: body.description as string,
+      price: parseFloat(body.price as string),
+      currency: body.currency as string,
+      duration_weeks: parseInt(body.duration_weeks as string),
+      level: body.level as string,
+      featured_image: body.featured_image as string,
+      published: body.published ? 1 : 0
+    })
 
     return c.redirect('/admin/courses')
   } catch (error) {

@@ -1,5 +1,12 @@
 // Utilidades para procesamiento de webhooks
 import type { D1Database } from "@cloudflare/workers-types";
+import {
+  updateEnrollmentStatus as modelUpdateEnrollmentStatus,
+  getEnrollmentByPaymentId as modelGetEnrollmentByPaymentId,
+  createEnrollment as modelCreateEnrollment,
+  revokeAccess as modelRevokeAccess
+} from './models/enrollments';
+import { recordTransaction as modelRecordTransaction } from './models/payments';
 
 /**
  * Crear tabla de logs de webhooks si no existe
@@ -55,13 +62,8 @@ export async function updateEnrollmentStatus(
   status: 'completed' | 'failed' | 'refunded',
   provider: 'stripe' | 'paypal'
 ) {
-  const result = await db.prepare(`
-    UPDATE paid_enrollments 
-    SET payment_status = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE payment_id = ? AND payment_method = ?
-  `).bind(status, paymentId, provider).run()
-
-  return result.meta.changes > 0
+  const result = await modelUpdateEnrollmentStatus(db, paymentId, status, provider)
+  return result.changes > 0
 }
 
 /**
@@ -72,10 +74,7 @@ export async function getEnrollmentByPaymentId(
   paymentId: string,
   provider: 'stripe' | 'paypal'
 ) {
-  return await db.prepare(`
-    SELECT * FROM paid_enrollments 
-    WHERE payment_id = ? AND payment_method = ?
-  `).bind(paymentId, provider).first()
+  return await modelGetEnrollmentByPaymentId(db, paymentId, provider)
 }
 
 /**
@@ -99,22 +98,18 @@ export async function createEnrollmentFromWebhook(
   }
 
   // Crear nueva inscripción
-  const result = await db.prepare(`
-    INSERT INTO paid_enrollments 
-      (user_id, course_id, payment_id, payment_status, amount_paid, currency, payment_method, enrolled_at)
-    VALUES (?, ?, ?, 'completed', ?, ?, ?, CURRENT_TIMESTAMP)
-  `).bind(
-    data.userId,
-    data.courseId,
-    data.paymentId,
-    data.amount,
-    data.currency,
-    data.provider
-  ).run()
+  const result = await modelCreateEnrollment(db, {
+    user_id: data.userId,
+    course_id: data.courseId,
+    payment_id: data.paymentId,
+    payment_status: 'completed',
+    amount_paid: data.amount,
+    currency: data.currency,
+    payment_method: data.provider
+  })
 
-  return await db.prepare(`
-    SELECT * FROM paid_enrollments WHERE id = ?
-  `).bind(result.meta.last_row_id).first()
+  // We can't fetch by ID directly without dbFirst, but getEnrollmentByPaymentId works
+  return await getEnrollmentByPaymentId(db, data.paymentId, data.provider)
 }
 
 /**
@@ -133,20 +128,16 @@ export async function logWebhookTransaction(
     metadata?: any
   }
 ) {
-  await db.prepare(`
-    INSERT INTO payment_transactions 
-      (user_id, enrollment_id, stripe_payment_intent_id, amount, currency, status, payment_method_type, metadata, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-  `).bind(
-    data.userId,
-    data.enrollmentId,
-    data.paymentIntentId || null,
-    data.amount,
-    data.currency,
-    data.status,
-    data.paymentMethodType,
-    data.metadata ? JSON.stringify(data.metadata) : null
-  ).run()
+  await modelRecordTransaction(db, {
+    user_id: data.userId,
+    enrollment_id: data.enrollmentId,
+    stripe_payment_intent_id: data.paymentIntentId,
+    amount: data.amount,
+    currency: data.currency,
+    status: data.status,
+    payment_method_type: data.paymentMethodType,
+    metadata: data.metadata
+  })
 }
 
 /**
@@ -186,11 +177,7 @@ export async function processRefund(
   })
 
   // Opcional: Revocar acceso
-  await db.prepare(`
-    UPDATE paid_enrollments 
-    SET access_revoked = 1 
-    WHERE id = ?
-  `).bind(enrollment.id).run()
+  await modelRevokeAccess(db, enrollment.id as number)
 
   return enrollment
 }
