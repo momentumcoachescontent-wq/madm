@@ -161,7 +161,11 @@ export const renderer = jsxRenderer(({ children }) => {
 
         {/* Scripts */}
         <script src="/static/app.js"></script>
-        <script src="/static/client.js"></script>
+        {import.meta.env.PROD ? (
+          <script type="module" src="/assets/client.js"></script>
+        ) : (
+          <script type="module" src="/src/client/index.ts"></script>
+        )}
       </body>
     </html>
   )

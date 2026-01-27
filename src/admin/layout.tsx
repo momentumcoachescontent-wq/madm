@@ -207,7 +207,7 @@ export const AdminLayout = (props: LayoutProps) => {
             </div>
         </main>
 
-        <script src="/static/admin.js"></script>
+        <script type="module" src="${import.meta.env.PROD ? '/assets/admin.js' : '/src/client/admin.ts'}"></script>
     </body>
     </html>
   `
