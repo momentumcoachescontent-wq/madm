@@ -23,6 +23,15 @@ export type NewUser = {
   avatar_url?: string
 }
 
+export type UpdateUser = {
+  name?: string
+  email?: string
+  role?: string
+  active?: number
+  email_verified?: number
+  password_hash?: string
+}
+
 /**
  * Get a user by ID
  */
@@ -50,6 +59,52 @@ export const createUser = async (db: D1Database, user: NewUser) => {
     `INSERT INTO users (name, email, password_hash, role, active, email_verified)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [user.name, user.email, user.password_hash, role, active, email_verified]
+  )
+}
+
+/**
+ * Update a user
+ */
+export const updateUser = async (db: D1Database, id: number, user: UpdateUser) => {
+  const fields: string[] = []
+  const values: any[] = []
+
+  if (user.name !== undefined) {
+    fields.push('name = ?')
+    values.push(user.name)
+  }
+  if (user.email !== undefined) {
+    fields.push('email = ?')
+    values.push(user.email)
+  }
+  if (user.role !== undefined) {
+    fields.push('role = ?')
+    values.push(user.role)
+  }
+  if (user.active !== undefined) {
+    fields.push('active = ?')
+    values.push(user.active)
+  }
+  if (user.email_verified !== undefined) {
+    fields.push('email_verified = ?')
+    values.push(user.email_verified)
+  }
+  if (user.password_hash !== undefined) {
+    fields.push('password_hash = ?')
+    values.push(user.password_hash)
+  }
+
+  if (fields.length === 0) return
+
+  // Add updated_at
+  fields.push("updated_at = datetime('now')")
+
+  values.push(id)
+
+  return await dbRun(
+    db,
+    `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
+    values
   )
 }
 
