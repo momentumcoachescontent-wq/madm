@@ -180,9 +180,11 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
         Estás editando un borrador no publicado (guardado el ${new Date(post.created_at || post.updated_at).toLocaleString()}).
         <br>
         <div style="margin-top: 10px;">
-            <a href="/admin/blog-posts/${post.id}/discard-draft" class="btn btn-sm btn-outline" style="color: #856404; border-color: #856404;" onclick="return confirm('¿Estás seguro? Se perderán los cambios del borrador actual.')">
-                Descartar cambios y volver a versión publicada
-            </a>
+            <form method="POST" action="/admin/blog-posts/${post.id}/discard-draft" style="display:inline;" onsubmit="return confirm('¿Estás seguro? Se perderán los cambios del borrador actual.')">
+                <button type="submit" class="btn btn-sm btn-outline" style="color: #856404; border-color: #856404;">
+                    Descartar cambios y volver a versión publicada
+                </button>
+            </form>
         </div>
       </div>
     ` : ''}
@@ -195,7 +197,7 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
 
       <div class="form-group">
         <label>Slug (URL)</label>
-        <input type="text" name="slug" value="${(Boolean(post.slug)) || ''}" required>
+        <input type="text" name="slug" value="${post.slug || ''}" required>
       </div>
 
       <div class="form-group">
@@ -324,7 +326,7 @@ app.post('/versions/:versionId/restore', async (c) => {
 })
 
 // DISCARD DRAFT
-app.get('/:id/discard-draft', async (c) => {
+app.post('/:id/discard-draft', async (c) => {
     const { deleteBlogPostVersion } = await import('../../../models/blog')
     const id = c.req.param('id')
 

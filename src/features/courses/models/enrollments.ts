@@ -215,13 +215,15 @@ export const getCompletedLessons = async (db: D1Database, userId: number, course
  * Find enrollment by PayPal capture ID in metadata
  */
 export const getEnrollmentByPayPalCaptureId = async (db: D1Database, captureId: string): Promise<Enrollment | null> => {
+  // Escape wildcard characters % and _ and the escape character itself \
+  const escapedId = captureId.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
   return await dbFirst<Enrollment>(
     db,
     `SELECT pe.* FROM paid_enrollments pe
      JOIN payment_transactions pt ON pe.id = pt.enrollment_id
-     WHERE pt.metadata LIKE ? AND pe.payment_method = 'paypal'
+     WHERE pt.metadata LIKE ? ESCAPE '\\' AND pe.payment_method = 'paypal'
      LIMIT 1`,
-    ['%' + captureId + '%']
+    ['%' + escapedId + '%']
   )
 }
 
@@ -233,7 +235,7 @@ export const getLatestEnrollment = async (db: D1Database, userId: number, course
     db,
     `SELECT * FROM paid_enrollments
      WHERE user_id = ? AND course_id = ? AND payment_method = ?
-     ORDER BY created_at DESC LIMIT 1`,
+     ORDER BY enrolled_at DESC LIMIT 1`,
     [userId, courseId, provider]
   )
 }

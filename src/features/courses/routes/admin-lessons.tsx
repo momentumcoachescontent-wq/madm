@@ -173,13 +173,21 @@ app.post('/', async (c) => {
   const body = await c.req.parseBody()
 
   try {
+    const courseId = parseInt(body.course_id as string, 10)
+    const moduleNumber = parseInt(body.module_number as string, 10)
+    const lessonNumber = parseInt(body.lesson_number as string, 10)
     let videoDuration = parseInt(String(body.video_duration || '0'), 10)
+
+    if (isNaN(courseId) || isNaN(moduleNumber) || isNaN(lessonNumber)) {
+        return c.text('Invalid numeric fields: Course ID, Module Number, and Lesson Number must be valid numbers.', 400)
+    }
+
     if (isNaN(videoDuration)) videoDuration = 0
 
     await createLesson(c.env.DB, {
-      course_id: parseInt(body.course_id as string),
-      module_number: parseInt(body.module_number as string),
-      lesson_number: parseInt(body.lesson_number as string),
+      course_id: courseId,
+      module_number: moduleNumber,
+      lesson_number: lessonNumber,
       title: body.title as string,
       description: body.description as string,
       video_url: body.video_url as string,
@@ -197,17 +205,27 @@ app.post('/', async (c) => {
 
 // Update Action
 app.post('/:id', async (c) => {
-  const id = c.req.param('id')
+  const id = parseInt(c.req.param('id'), 10)
+  if (isNaN(id)) return c.text('Invalid Lesson ID', 400)
+
   const body = await c.req.parseBody()
 
   try {
+    const courseId = parseInt(body.course_id as string, 10)
+    const moduleNumber = parseInt(body.module_number as string, 10)
+    const lessonNumber = parseInt(body.lesson_number as string, 10)
     let videoDuration = parseInt(String(body.video_duration || '0'), 10)
+
+    if (isNaN(courseId) || isNaN(moduleNumber) || isNaN(lessonNumber)) {
+        return c.text('Invalid numeric fields: Course ID, Module Number, and Lesson Number must be valid numbers.', 400)
+    }
+
     if (isNaN(videoDuration)) videoDuration = 0
 
-    await updateLesson(c.env.DB, parseInt(id), {
-      course_id: parseInt(body.course_id as string),
-      module_number: parseInt(body.module_number as string),
-      lesson_number: parseInt(body.lesson_number as string),
+    await updateLesson(c.env.DB, id, {
+      course_id: courseId,
+      module_number: moduleNumber,
+      lesson_number: lessonNumber,
       title: body.title as string,
       description: body.description as string,
       video_url: body.video_url as string,
