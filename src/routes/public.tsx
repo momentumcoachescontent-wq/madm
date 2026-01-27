@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { CloudflareBindings } from '../types'
+import sanitizeHtml from 'sanitize-html'
 
 export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   const publicRoutes = new Hono<{ Bindings: CloudflareBindings }>()
@@ -1562,9 +1563,9 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
                   {post.content.split('\n\n').map((paragraph: string, idx: number) => (
                     <div key={idx}>
                       {paragraph.startsWith('**') ? (
-                        <h3 dangerouslySetInnerHTML={{ __html: paragraph.replace(/\*\*/g, '') }}></h3>
+                        <h3 dangerouslySetInnerHTML={{ __html: sanitizeHtml(paragraph.replace(/\*\*/g, '')) }}></h3>
                       ) : (
-                        <p dangerouslySetInnerHTML={{ __html: paragraph }}></p>
+                        <p dangerouslySetInnerHTML={{ __html: sanitizeHtml(paragraph) }}></p>
                       )}
                     </div>
                   ))}

@@ -148,7 +148,7 @@ const MediaLibraryHelper = (objects: R2Object[], cursor?: string) => html`
             </div>
           </div>
           <div class="media-actions">
-            <button class="media-action-btn" data-url="${url}" title="Copiar URL">
+            <button class="media-action-btn copy-btn" data-url="${url}" title="Copiar URL">
               <i class="fas fa-link"></i>
             </button>
             <a href="${url}" target="_blank" class="media-action-btn" title="Ver / Descargar">

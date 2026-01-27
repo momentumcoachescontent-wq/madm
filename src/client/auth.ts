@@ -32,7 +32,12 @@ export function initLogin(formId: string = 'login-form', messageId: string = 'au
 
         // Check for redirect param
         const urlParams = new URLSearchParams(window.location.search);
-        const redirect = urlParams.get('redirect');
+        let redirect = urlParams.get('redirect');
+
+        // Validate redirect (only allow relative paths)
+        if (redirect && (!redirect.startsWith('/') || redirect.startsWith('//'))) {
+          redirect = null;
+        }
 
         setTimeout(() => {
           window.location.href = redirect || '/mi-aprendizaje';

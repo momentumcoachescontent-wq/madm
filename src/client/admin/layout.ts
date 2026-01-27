@@ -25,8 +25,13 @@ export function initLayout() {
     logoutBtn.addEventListener('click', async () => {
       if(!confirm('¿Cerrar sesión?')) return;
       try {
-        await fetch('/api/logout', { method: 'POST' });
-        window.location.href = '/login';
+        const response = await fetch('/api/logout', { method: 'POST' });
+        if (response.ok) {
+          window.location.href = '/login';
+        } else {
+          console.error('Logout failed', response.status);
+          alert('Error al cerrar sesión');
+        }
       } catch (e) {
         console.error('Logout failed', e);
         alert('Error al cerrar sesión');

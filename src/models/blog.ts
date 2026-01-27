@@ -1,4 +1,5 @@
 import { dbFirst, dbAll, dbRun } from './db'
+import sanitizeHtml from 'sanitize-html'
 
 export interface BlogPost {
   id: number
@@ -130,7 +131,7 @@ export const createBlogPost = async (db: D1Database, post: NewBlogPost) => {
     [
       post.title,
       post.slug,
-      post.content,
+      sanitizeHtml(post.content),
       post.excerpt || null,
       post.image_url || null,
       post.hashtags || null,
@@ -150,7 +151,10 @@ export const updateBlogPost = async (db: D1Database, id: number, post: UpdateBlo
 
   if (post.title !== undefined) { updates.push('title = ?'); args.push(post.title) }
   if (post.slug !== undefined) { updates.push('slug = ?'); args.push(post.slug) }
-  if (post.content !== undefined) { updates.push('content = ?'); args.push(post.content) }
+  if (post.content !== undefined) {
+    updates.push('content = ?')
+    args.push(sanitizeHtml(post.content))
+  }
   if (post.excerpt !== undefined) { updates.push('excerpt = ?'); args.push(post.excerpt) }
   if (post.image_url !== undefined) { updates.push('image_url = ?'); args.push(post.image_url) }
   if (post.hashtags !== undefined) { updates.push('hashtags = ?'); args.push(post.hashtags) }
