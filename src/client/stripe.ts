@@ -85,11 +85,11 @@ function setupStripe(options: CheckoutOptions) {
 
   // Also attach event listeners directly if possible (in case inline onclick is removed)
   const stripeBtn = document.getElementById('select-stripe');
-  if (stripeBtn) {
+  if (stripeBtn && !stripeBtn.getAttribute('onclick')) {
       stripeBtn.addEventListener('click', () => (window as any).selectPaymentMethod('stripe'));
   }
   const paypalBtn = document.getElementById('select-paypal');
-  if (paypalBtn) {
+  if (paypalBtn && !paypalBtn.getAttribute('onclick')) {
       paypalBtn.addEventListener('click', () => (window as any).selectPaymentMethod('paypal'));
   }
 

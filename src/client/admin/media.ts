@@ -11,7 +11,7 @@ export function initMediaLibrary() {
       const target = e.target as HTMLElement;
 
       // Handle Copy URL
-      const copyBtn = target.closest('.media-action-btn:not(.delete)') as HTMLButtonElement;
+      const copyBtn = target.closest('.copy-btn') as HTMLButtonElement;
       if (copyBtn) {
         const url = copyBtn.dataset.url;
         if (url) copyUrl(url);
