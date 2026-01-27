@@ -1,6 +1,9 @@
 import { Hono } from 'hono'
 import { CloudflareBindings } from '../types'
 import sanitizeHtml from 'sanitize-html'
+import { HeroSection } from '../views/components/HeroSection'
+import { Card } from '../views/components/Card'
+import { Button } from '../views/components/Button'
 
 export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   const publicRoutes = new Hono<{ Bindings: CloudflareBindings }>()
@@ -28,59 +31,42 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
     return c.render(
       <div>
         {/* Hero Principal */}
-        <section className="hero">
-          <div className="container">
-            <div className="hero-content">
-              <h1 className="hero-title">Más Allá del Miedo</h1>
-              <p className="hero-subtitle">
-                Aprende a entender tu mente y proteger tu corazón
-              </p>
-              <p className="hero-description">
-                Herramientas psicológicas simples para que puedas dejar de sobrevivir en piloto automático
-                y empezar a vivir con claridad, límites y poder personal.
-              </p>
-              <div className="hero-buttons">
-                <a href="/recursos-gratuitos" className="btn btn-primary">
-                  <i className="fas fa-download"></i> Descarga la guía gratuita
-                </a>
-                <a href="/el-libro" className="btn btn-secondary">
-                  <i className="fas fa-book"></i> Conoce el libro
-                </a>
-              </div>
+        <HeroSection
+          title="Más Allá del Miedo"
+          subtitle="Aprende a entender tu mente y proteger tu corazón"
+          description="Herramientas psicológicas simples para que puedas dejar de sobrevivir en piloto automático y empezar a vivir con claridad, límites y poder personal."
+          variant="large"
+          image={
+            <div className="book-mockup">
+              <i className="fas fa-book-open fa-10x"></i>
             </div>
-            <div className="hero-image">
-              <div className="book-mockup">
-                <i className="fas fa-book-open fa-10x"></i>
-              </div>
-            </div>
-          </div>
-        </section>
+          }
+        >
+          <a href="/recursos-gratuitos" className="btn btn-primary">
+            <i className="fas fa-download"></i> Descarga la guía gratuita
+          </a>
+          <a href="/el-libro" className="btn btn-secondary">
+            <i className="fas fa-book"></i> Conoce el libro
+          </a>
+        </HeroSection>
 
         {/* El Problema */}
         <section className="section bg-light">
           <div className="container">
             <h2 className="section-title">¿Te has sentido así?</h2>
             <div className="cards-grid">
-              <div className="card">
-                <i className="fas fa-heart-broken fa-3x card-icon"></i>
-                <h3>Relaciones confusas</h3>
+              <Card title="Relaciones confusas" icon="fas fa-heart-broken">
                 <p>"No sé si esta relación es sana"</p>
-              </div>
-              <div className="card">
-                <i className="fas fa-exclamation-triangle fa-3x card-icon"></i>
-                <h3>Culpa constante</h3>
+              </Card>
+              <Card title="Culpa constante" icon="fas fa-exclamation-triangle">
                 <p>"Siento culpa por decir que no"</p>
-              </div>
-              <div className="card">
-                <i className="fas fa-mask fa-3x card-icon"></i>
-                <h3>Manipulación invisible</h3>
+              </Card>
+              <Card title="Manipulación invisible" icon="fas fa-mask">
                 <p>"Me manipulan y no me doy cuenta hasta tarde"</p>
-              </div>
-              <div className="card">
-                <i className="fas fa-users fa-3x card-icon"></i>
-                <h3>Presión social</h3>
+              </Card>
+              <Card title="Presión social" icon="fas fa-users">
                 <p>"Hago cosas que no quiero para encajar"</p>
-              </div>
+              </Card>
             </div>
           </div>
         </section>
@@ -93,26 +79,18 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
               Más Allá del Miedo no es solo un libro, es un sistema completo de apoyo emocional
             </p>
             <div className="features-grid">
-              <div className="feature">
-                <i className="fas fa-book fa-2x"></i>
-                <h3>El Libro</h3>
+              <Card className="feature" title="El Libro" icon="fas fa-book" iconSize="fa-2x" iconClass="">
                 <p>Historias reales y herramientas prácticas</p>
-              </div>
-              <div className="feature">
-                <i className="fas fa-route fa-2x"></i>
-                <h3>Método Probado</h3>
+              </Card>
+              <Card className="feature" title="Método Probado" icon="fas fa-route" iconSize="fa-2x" iconClass="">
                 <p>5 etapas para recuperar tu poder</p>
-              </div>
-              <div className="feature">
-                <i className="fas fa-graduation-cap fa-2x"></i>
-                <h3>Cursos Online</h3>
+              </Card>
+              <Card className="feature" title="Cursos Online" icon="fas fa-graduation-cap" iconSize="fa-2x" iconClass="">
                 <p>Aprende a tu ritmo con videos y ejercicios</p>
-              </div>
-              <div className="feature">
-                <i className="fas fa-users-cog fa-2x"></i>
-                <h3>Comunidad</h3>
+              </Card>
+              <Card className="feature" title="Comunidad" icon="fas fa-users-cog" iconSize="fa-2x" iconClass="">
                 <p>Espacio seguro de apoyo y crecimiento</p>
-              </div>
+              </Card>
             </div>
           </div>
         </section>
@@ -185,24 +163,18 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
               Recursos descargables para comenzar tu transformación hoy
             </p>
             <div className="resources-grid">
-              <div className="resource-card">
-                <i className="fas fa-file-pdf fa-3x"></i>
-                <h3>Test de Autoconocimiento</h3>
+              <Card className="resource-card" title="Test de Autoconocimiento" icon="fas fa-file-pdf" iconClass="">
                 <p>¿Qué tan claros son tus límites emocionales?</p>
-                <a href="/recursos-gratuitos" className="btn btn-sm">Descargar</a>
-              </div>
-              <div className="resource-card">
-                <i className="fas fa-exclamation-circle fa-3x"></i>
-                <h3>7 Señales de Alerta</h3>
+                <Button href="/recursos-gratuitos" size="sm" variant={null}>Descargar</Button>
+              </Card>
+              <Card className="resource-card" title="7 Señales de Alerta" icon="fas fa-exclamation-circle" iconClass="">
                 <p>Identifica relaciones tóxicas antes de que sea tarde</p>
-                <a href="/recursos-gratuitos" className="btn btn-sm">Descargar</a>
-              </div>
-              <div className="resource-card">
-                <i className="fas fa-shield-alt fa-3x"></i>
-                <h3>Checklist de Límites</h3>
+                <Button href="/recursos-gratuitos" size="sm" variant={null}>Descargar</Button>
+              </Card>
+              <Card className="resource-card" title="Checklist de Límites" icon="fas fa-shield-alt" iconClass="">
                 <p>¿Tus límites son claros o difusos?</p>
-                <a href="/recursos-gratuitos" className="btn btn-sm">Descargar</a>
-              </div>
+                <Button href="/recursos-gratuitos" size="sm" variant={null}>Descargar</Button>
+              </Card>
             </div>
           </div>
         </section>
@@ -232,14 +204,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   publicRoutes.get('/el-libro', (c) => {
     return c.render(
       <div>
-        <section className="hero hero-small">
-          <div className="container">
-            <h1>El Libro: Más Allá del Miedo</h1>
-            <p className="lead">
-              Una historia y una guía práctica para que tomes el control de tu vida emocional
-            </p>
-          </div>
-        </section>
+        <HeroSection
+          title="El Libro: Más Allá del Miedo"
+          subtitle="Una historia y una guía práctica para que tomes el control de tu vida emocional"
+          variant="small"
+        />
 
         <section className="section">
           <div className="container">
@@ -373,14 +342,12 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   publicRoutes.get('/metodo', (c) => {
     return c.render(
       <div>
-        <section className="hero hero-small bg-gradient">
-          <div className="container">
-            <h1>Método "Más Allá del Miedo"</h1>
-            <p className="lead">
-              Un camino estructurado en 5 etapas para transformar el miedo en claridad y poder personal
-            </p>
-          </div>
-        </section>
+        <HeroSection
+          title='Método "Más Allá del Miedo"'
+          subtitle="Un camino estructurado en 5 etapas para transformar el miedo en claridad y poder personal"
+          variant="small"
+          className="bg-gradient"
+        />
 
         <section className="section">
           <div className="container">
@@ -556,14 +523,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   publicRoutes.get('/recursos-gratuitos', (c) => {
     return c.render(
       <div>
-        <section className="hero hero-small">
-          <div className="container">
-            <h1>Recursos Gratuitos</h1>
-            <p className="lead">
-              Empieza a ir más allá del miedo incluso si hoy no puedes invertir dinero
-            </p>
-          </div>
-        </section>
+        <HeroSection
+          title="Recursos Gratuitos"
+          subtitle="Empieza a ir más allá del miedo incluso si hoy no puedes invertir dinero"
+          variant="small"
+        />
 
         <section className="section">
           <div className="container">
@@ -740,14 +704,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   publicRoutes.get('/contacto', (c) => {
     return c.render(
       <div>
-        <section className="hero hero-small">
-          <div className="container">
-            <h1>Contacto y Soporte</h1>
-            <p className="lead">
-              ¿Tienes dudas o necesitas ayuda? Estamos aquí para ti
-            </p>
-          </div>
-        </section>
+        <HeroSection
+          title="Contacto y Soporte"
+          subtitle="¿Tienes dudas o necesitas ayuda? Estamos aquí para ti"
+          variant="small"
+        />
 
         <section className="section">
           <div className="container">
@@ -875,12 +836,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   publicRoutes.get('/comunidad', (c) => {
     return c.render(
       <div>
-        <section className="hero hero-small">
-          <div className="container">
-            <h1>Comunidad</h1>
-            <p className="lead">Un espacio seguro para crecer juntos</p>
-          </div>
-        </section>
+        <HeroSection
+          title="Comunidad"
+          subtitle="Un espacio seguro para crecer juntos"
+          variant="small"
+        />
 
         <section className="section">
           <div className="container">
@@ -1010,12 +970,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   publicRoutes.get('/sobre-nosotros', (c) => {
     return c.render(
       <div>
-        <section className="hero hero-small">
-          <div className="container">
-            <h1>Sobre Nosotros</h1>
-            <p className="lead">La historia detrás de "Más Allá del Miedo"</p>
-          </div>
-        </section>
+        <HeroSection
+          title="Sobre Nosotros"
+          subtitle='La historia detrás de "Más Allá del Miedo"'
+          variant="small"
+        />
 
         <section className="section">
           <div className="container">
@@ -1150,12 +1109,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   publicRoutes.get('/login', (c) => {
     return c.render(
       <div>
-        <section className="hero hero-small">
-          <div className="container">
-            <h1>Iniciar Sesión</h1>
-            <p className="lead">Accede a tus cursos y continúa aprendiendo</p>
-          </div>
-        </section>
+        <HeroSection
+          title="Iniciar Sesión"
+          subtitle="Accede a tus cursos y continúa aprendiendo"
+          variant="small"
+        />
 
         <section className="section">
           <div className="container">
@@ -1208,12 +1166,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   publicRoutes.get('/registro', (c) => {
     return c.render(
       <div>
-        <section className="hero hero-small">
-          <div className="container">
-            <h1>Crear Cuenta</h1>
-            <p className="lead">Únete a nuestra comunidad y comienza tu transformación</p>
-          </div>
-        </section>
+        <HeroSection
+          title="Crear Cuenta"
+          subtitle="Únete a nuestra comunidad y comienza tu transformación"
+          variant="small"
+        />
 
         <section className="section">
           <div className="container">
@@ -1286,12 +1243,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
 
       return c.render(
         <div>
-          <section className="hero hero-small">
-            <div className="container">
-              <h1>Verificación de Certificado</h1>
-              <p className="lead">Comprueba la autenticidad de un certificado</p>
-            </div>
-          </section>
+          <HeroSection
+            title="Verificación de Certificado"
+            subtitle="Comprueba la autenticidad de un certificado"
+            variant="small"
+          />
 
           <section className="section">
             <div className="container" style="max-width: 800px;">
@@ -1407,14 +1363,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
 
       return c.render(
         <div>
-          <section className="hero hero-small">
-            <div className="container">
-              <h1>Blog: Más Allá del Miedo</h1>
-              <p className="lead">
-                Artículos, herramientas y reflexiones para tu crecimiento emocional
-              </p>
-            </div>
-          </section>
+          <HeroSection
+            title="Blog: Más Allá del Miedo"
+            subtitle="Artículos, herramientas y reflexiones para tu crecimiento emocional"
+            variant="small"
+          />
 
           <section className="section">
             <div className="container">
@@ -1651,14 +1604,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
       return c.render(
         <div>
           {/* Hero */}
-          <section className="hero hero-small">
-            <div className="container">
-              <h1>Cursos y Programas</h1>
-              <p className="lead">
-                Programas estructurados para desarrollar habilidades emocionales y relacionales que cambiarán tu vida
-              </p>
-            </div>
-          </section>
+          <HeroSection
+            title="Cursos y Programas"
+            subtitle="Programas estructurados para desarrollar habilidades emocionales y relacionales que cambiarán tu vida"
+            variant="small"
+          />
 
           {/* Filtros */}
           <section className="section">

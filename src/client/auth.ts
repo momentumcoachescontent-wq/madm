@@ -130,11 +130,11 @@ export function initLogout() {
 
 export async function checkAuth() {
   function remove(id: string) {
-    var el = document.getElementById(id);
+    const el = document.getElementById(id);
     if (el) el.remove();
   }
   function show(id: string, display?: string) {
-    var el = document.getElementById(id);
+    const el = document.getElementById(id);
     if (el) el.style.display = display || 'inline-flex';
   }
 
@@ -148,7 +148,7 @@ export async function checkAuth() {
       show('dashboard-link');
 
       if (data.user.role === 'admin') {
-        var adminLink = document.getElementById('admin-link');
+        const adminLink = document.getElementById('admin-link');
         if (adminLink) adminLink.style.display = '';
       } else {
         remove('admin-link');
