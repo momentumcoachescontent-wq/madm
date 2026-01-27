@@ -1360,20 +1360,10 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   // Página: Verificar Certificado (pública)
   publicRoutes.get('/verificar/:code', async (c) => {
     try {
+      const { getCertificateByCode } = await import('../models/enrollments')
       const code = c.req.param('code')
 
-      const certificate = await c.env.DB.prepare(`
-        SELECT
-          c.*,
-          u.name as user_name,
-          co.title as course_title,
-          co.subtitle as course_subtitle,
-          co.duration_weeks
-        FROM certificates c
-        JOIN users u ON c.user_id = u.id
-        JOIN courses co ON c.course_id = co.id
-        WHERE c.certificate_code = ? AND c.verified = 1
-      `).bind(code).first<any>()
+      const certificate = await getCertificateByCode(c.env.DB, code)
 
       const isValid = !!certificate
 
@@ -1738,14 +1728,8 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   // Página: Listado de Cursos
   publicRoutes.get('/cursos', async (c) => {
     try {
-      const result = await c.env.DB.prepare(`
-        SELECT id, slug, title, subtitle, description, duration_weeks, level, price, currency, featured_image, featured, enrollment_count, rating
-        FROM courses
-        WHERE published = 1
-        ORDER BY featured DESC, created_at DESC
-      `).all<any>()
-
-      const courses = result.results || []
+      const { listPublishedCourses } = await import('../models/courses')
+      const courses = await listPublishedCourses(c.env.DB)
 
       return c.render(
         <div>
@@ -1846,13 +1830,12 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   // Página: Detalle de Curso Individual
   publicRoutes.get('/cursos/:slug', async (c) => {
     try {
+      const { getCourseBySlug } = await import('../models/courses')
       const slug = c.req.param('slug')
 
-      const result = await c.env.DB.prepare(`
-        SELECT * FROM courses WHERE slug = ? AND published = 1
-      `).bind(slug).first<any>()
+      const course = await getCourseBySlug(c.env.DB, slug)
 
-      if (!result) {
+      if (!course || !course.published) {
         return c.render(
           <div>
             <section className="section">
@@ -1866,14 +1849,13 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
         )
       }
 
-      const course = result
-
       // Verificar si el usuario está autenticado e inscrito
       let isEnrolled = false
       let firstLessonId = null
 
       try {
         const { getCurrentUser, userHasAccess } = await import('../auth-utils')
+        const { getFirstLesson } = await import('../models/lessons')
         const user = await getCurrentUser(c)
 
         if (user) {
@@ -1881,13 +1863,7 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
 
           if (isEnrolled) {
             // Obtener primera lección
-            const firstLesson = await c.env.DB.prepare(`
-              SELECT id FROM lessons
-              WHERE course_id = ? AND published = 1
-              ORDER BY order_index ASC
-              LIMIT 1
-            `).bind(course.id).first<any>()
-
+            const firstLesson = await getFirstLesson(c.env.DB, course.id)
             firstLessonId = firstLesson?.id
           }
         }

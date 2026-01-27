@@ -197,9 +197,8 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
 
       if (sessionToken) {
         // Eliminar sesión de base de datos
-        await c.env.DB.prepare(`
-          DELETE FROM user_sessions WHERE session_token = ?
-        `).bind(sessionToken).run()
+        const { deleteSession } = await import('../models/users')
+        await deleteSession(c.env.DB, sessionToken)
       }
 
       // Borrar cookie
@@ -251,7 +250,8 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   // API: Crear Payment Intent de Stripe
   apiRoutes.post('/create-payment-intent', async (c) => {
     try {
-      const { getCurrentUser } = await import('../auth-utils')
+      const { getCurrentUser, userHasAccess } = await import('../auth-utils')
+      const { getCourseById } = await import('../models/courses')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -262,21 +262,16 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       const { courseId } = body
 
       // Obtener información del curso
-      const course = await c.env.DB.prepare(`
-        SELECT id, title, price, currency FROM courses WHERE id = ? AND published = 1
-      `).bind(courseId).first<any>()
+      const course = await getCourseById(c.env.DB, courseId)
 
-      if (!course) {
+      if (!course || !course.published) {
         return c.json({ error: 'Curso no encontrado' }, 404)
       }
 
       // Verificar si ya está inscrito
-      const enrollment = await c.env.DB.prepare(`
-        SELECT id FROM paid_enrollments
-        WHERE user_id = ? AND course_id = ? AND payment_status = 'completed'
-      `).bind(user.id, courseId).first<any>()
+      const hasAccess = await userHasAccess(c.env.DB, user.id, courseId)
 
-      if (enrollment) {
+      if (hasAccess) {
         return c.json({ error: 'Ya estás inscrito en este curso' }, 400)
       }
 
@@ -308,6 +303,9 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   apiRoutes.post('/verify-payment', async (c) => {
     try {
       const { getCurrentUser } = await import('../auth-utils')
+      const { getCourseById } = await import('../models/courses')
+      const { createEnrollment } = await import('../models/enrollments')
+      const { recordTransaction } = await import('../models/payments')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -328,39 +326,33 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       }
 
       // Obtener información del curso
-      const course = await c.env.DB.prepare(`
-        SELECT id, title, price, currency FROM courses WHERE id = ? AND published = 1
-      `).bind(courseId).first<any>()
+      const course = await getCourseById(c.env.DB, courseId)
 
-      if (!course) {
+      if (!course || !course.published) {
         return c.json({ error: 'Curso no encontrado' }, 404)
       }
 
       // Crear inscripción pagada
-      const result = await c.env.DB.prepare(`
-        INSERT INTO paid_enrollments
-          (user_id, course_id, payment_id, payment_status, amount_paid, currency, payment_method, enrolled_at)
-        VALUES (?, ?, ?, 'completed', ?, ?, 'stripe', CURRENT_TIMESTAMP)
-      `).bind(
-        user.id,
-        courseId,
-        paymentIntentId,
-        course.price,
-        course.currency
-      ).run()
+      const enrollmentResult = await createEnrollment(c.env.DB, {
+        user_id: user.id,
+        course_id: courseId,
+        payment_id: paymentIntentId,
+        payment_status: 'completed',
+        amount_paid: course.price,
+        currency: course.currency,
+        payment_method: 'stripe'
+      })
 
       // Registrar transacción
-      await c.env.DB.prepare(`
-        INSERT INTO payment_transactions
-          (user_id, enrollment_id, stripe_payment_intent_id, amount, currency, status, payment_method_type, created_at)
-        VALUES (?, ?, ?, ?, ?, 'succeeded', 'card', CURRENT_TIMESTAMP)
-      `).bind(
-        user.id,
-        result.meta.last_row_id,
-        paymentIntentId,
-        course.price,
-        course.currency
-      ).run()
+      await recordTransaction(c.env.DB, {
+        user_id: user.id,
+        enrollment_id: enrollmentResult.last_row_id as number,
+        stripe_payment_intent_id: paymentIntentId,
+        amount: course.price,
+        currency: course.currency,
+        status: 'succeeded',
+        payment_method_type: 'card'
+      })
 
       return c.json({
         success: true,
@@ -377,6 +369,7 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   apiRoutes.post('/create-paypal-order', async (c) => {
     try {
       const { getCurrentUser } = await import('../auth-utils')
+      const { getCourseById } = await import('../models/courses')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -387,11 +380,9 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       const { courseId } = body
 
       // Obtener información del curso
-      const course = await c.env.DB.prepare(`
-        SELECT id, title, price, currency FROM courses WHERE id = ? AND published = 1
-      `).bind(courseId).first<any>()
+      const course = await getCourseById(c.env.DB, courseId)
 
-      if (!course) {
+      if (!course || !course.published) {
         return c.json({ error: 'Curso no encontrado' }, 404)
       }
 
@@ -439,6 +430,9 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   apiRoutes.post('/capture-paypal-order', async (c) => {
     try {
       const { getCurrentUser } = await import('../auth-utils')
+      const { getCourseById } = await import('../models/courses')
+      const { createEnrollment } = await import('../models/enrollments')
+      const { recordTransaction } = await import('../models/payments')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -470,39 +464,33 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       }
 
       // Obtener información del curso
-      const course = await c.env.DB.prepare(`
-        SELECT id, title, price, currency FROM courses WHERE id = ? AND published = 1
-      `).bind(courseId).first<any>()
+      const course = await getCourseById(c.env.DB, courseId)
 
-      if (!course) {
+      if (!course || !course.published) {
         return c.json({ error: 'Curso no encontrado' }, 404)
       }
 
       // Crear inscripción pagada
-      const result = await c.env.DB.prepare(`
-        INSERT INTO paid_enrollments
-          (user_id, course_id, payment_id, payment_status, amount_paid, currency, payment_method, enrolled_at)
-        VALUES (?, ?, ?, 'completed', ?, ?, 'paypal', CURRENT_TIMESTAMP)
-      `).bind(
-        user.id,
-        courseId,
-        orderId,
-        course.price,
-        course.currency
-      ).run()
+      const enrollmentResult = await createEnrollment(c.env.DB, {
+        user_id: user.id,
+        course_id: courseId,
+        payment_id: orderId,
+        payment_status: 'completed',
+        amount_paid: course.price,
+        currency: course.currency,
+        payment_method: 'paypal'
+      })
 
       // Registrar transacción
-      await c.env.DB.prepare(`
-        INSERT INTO payment_transactions
-          (user_id, enrollment_id, amount, currency, status, payment_method_type, metadata, created_at)
-        VALUES (?, ?, ?, ?, 'succeeded', 'paypal', ?, CURRENT_TIMESTAMP)
-      `).bind(
-        user.id,
-        result.meta.last_row_id,
-        course.price,
-        course.currency,
-        JSON.stringify({ orderId, captureId: capture.id })
-      ).run()
+      await recordTransaction(c.env.DB, {
+        user_id: user.id,
+        enrollment_id: enrollmentResult.last_row_id as number,
+        amount: course.price,
+        currency: course.currency,
+        status: 'succeeded',
+        payment_method_type: 'paypal',
+        metadata: { orderId, captureId: capture.id }
+      })
 
       return c.json({
         success: true,
@@ -555,7 +543,8 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   // API: Marcar lección como completada
   apiRoutes.post('/lessons/:lessonId/complete', async (c) => {
     try {
-      const { getCurrentUser } = await import('../auth-utils')
+      const { getCurrentUser, userHasAccess, getCourseProgress } = await import('../auth-utils')
+      const { updateLessonProgress, updateEnrollmentCompletion, generateCertificate, getEnrollment } = await import('../models/enrollments')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -566,7 +555,6 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       const { completed, courseId } = await c.req.json()
 
       // Verificar que la lección existe y el usuario tiene acceso
-      const { userHasAccess } = await import('../auth-utils')
       const hasAccess = await userHasAccess(c.env.DB, user.id, courseId)
 
       if (!hasAccess) {
@@ -574,47 +562,22 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       }
 
       // Upsert progress
-      const now = new Date().toISOString()
-
-      await c.env.DB.prepare(`
-        INSERT INTO student_progress (user_id, lesson_id, course_id, completed, progress_percentage, completed_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(user_id, lesson_id)
-        DO UPDATE SET
-          completed = excluded.completed,
-          progress_percentage = CASE WHEN excluded.completed = 1 THEN 100 ELSE progress_percentage END,
-          completed_at = CASE WHEN excluded.completed = 1 THEN excluded.completed_at ELSE completed_at END,
-          updated_at = excluded.updated_at
-      `).bind(
-        user.id,
-        lessonId,
-        courseId,
-        completed ? 1 : 0,
-        completed ? 100 : 0,
-        completed ? now : null,
-        now
-      ).run()
+      await updateLessonProgress(c.env.DB, user.id, lessonId, courseId, {
+        completed: completed ? 1 : 0
+      })
 
       // Actualizar progreso del curso en paid_enrollments
-      const { getCourseProgress } = await import('../auth-utils')
       const progress = await getCourseProgress(c.env.DB, user.id, courseId)
 
-      const updateResult = await c.env.DB.prepare(`
-        UPDATE paid_enrollments
-        SET
-          completed = CASE WHEN ? = 100 THEN 1 ELSE 0 END,
-          completion_date = CASE WHEN ? = 100 THEN ? ELSE completion_date END,
-          certificate_issued = CASE WHEN ? = 100 THEN 1 ELSE certificate_issued END
-        WHERE user_id = ? AND course_id = ?
-      `).bind(progress.percentage, progress.percentage, now, progress.percentage, user.id, courseId).run()
+      // Si completado al 100%, actualizar enrollment
+      const isCompleted = progress.percentage === 100
+      await updateEnrollmentCompletion(c.env.DB, user.id, courseId, isCompleted)
 
       // Generar certificado automáticamente si completó al 100%
       let certificateId = null
-      if (progress.percentage === 100) {
+      if (isCompleted) {
         // Obtener enrollment_id
-        const enrollment = await c.env.DB.prepare(`
-          SELECT id FROM paid_enrollments WHERE user_id = ? AND course_id = ?
-        `).bind(user.id, courseId).first<any>()
+        const enrollment = await getEnrollment(c.env.DB, user.id, courseId)
 
         if (enrollment) {
           certificateId = await generateCertificate(c.env.DB, user.id, courseId, enrollment.id)
@@ -626,7 +589,7 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
         progress: progress.percentage,
         completed_lessons: progress.completed,
         total_lessons: progress.total,
-        certificateGenerated: progress.percentage === 100,
+        certificateGenerated: isCompleted,
         certificateId: certificateId
       })
     } catch (error) {
@@ -638,7 +601,8 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   // API: Guardar notas de lección
   apiRoutes.post('/lessons/:lessonId/notes', async (c) => {
     try {
-      const { getCurrentUser } = await import('../auth-utils')
+      const { getCurrentUser, userHasAccess } = await import('../auth-utils')
+      const { updateLessonProgress } = await import('../models/enrollments')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -649,22 +613,14 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       const { notes, courseId } = await c.req.json()
 
       // Verificar acceso
-      const { userHasAccess } = await import('../auth-utils')
       const hasAccess = await userHasAccess(c.env.DB, user.id, courseId)
 
       if (!hasAccess) {
         return c.json({ error: 'No tienes acceso a este curso' }, 403)
       }
 
-      const now = new Date().toISOString()
-
       // Upsert notes
-      await c.env.DB.prepare(`
-        INSERT INTO student_progress (user_id, lesson_id, course_id, notes, updated_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(user_id, lesson_id)
-        DO UPDATE SET notes = excluded.notes, updated_at = excluded.updated_at
-      `).bind(user.id, lessonId, courseId, notes, now).run()
+      await updateLessonProgress(c.env.DB, user.id, lessonId, courseId, { notes })
 
       return c.json({ success: true })
     } catch (error) {
@@ -676,7 +632,8 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   // API: Actualizar posición del video
   apiRoutes.post('/lessons/:lessonId/progress', async (c) => {
     try {
-      const { getCurrentUser } = await import('../auth-utils')
+      const { getCurrentUser, userHasAccess } = await import('../auth-utils')
+      const { updateLessonProgress } = await import('../models/enrollments')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -687,26 +644,19 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       const { position, duration, courseId } = await c.req.json()
 
       // Verificar acceso
-      const { userHasAccess } = await import('../auth-utils')
       const hasAccess = await userHasAccess(c.env.DB, user.id, courseId)
 
       if (!hasAccess) {
         return c.json({ error: 'No tienes acceso a este curso' }, 403)
       }
 
-      const now = new Date().toISOString()
       const progressPercentage = duration > 0 ? Math.min(100, Math.round((position / duration) * 100)) : 0
 
       // Upsert progress
-      await c.env.DB.prepare(`
-        INSERT INTO student_progress (user_id, lesson_id, course_id, last_position, progress_percentage, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(user_id, lesson_id)
-        DO UPDATE SET
-          last_position = excluded.last_position,
-          progress_percentage = CASE WHEN completed = 0 THEN excluded.progress_percentage ELSE progress_percentage END,
-          updated_at = excluded.updated_at
-      `).bind(user.id, lessonId, courseId, Math.round(position), progressPercentage, now).run()
+      await updateLessonProgress(c.env.DB, user.id, lessonId, courseId, {
+        last_position: Math.round(position),
+        progress_percentage: progressPercentage
+      })
 
       return c.json({ success: true })
     } catch (error) {
@@ -718,7 +668,11 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   // API: Enviar respuestas del quiz
   apiRoutes.post('/quiz/submit', async (c) => {
     try {
-      const { getCurrentUser } = await import('../auth-utils')
+      const { getCurrentUser, userHasAccess } = await import('../auth-utils')
+      const {
+        getQuiz, getQuizAttempts, getQuizQuestions, getQuizOptions,
+        createQuizAttempt, createQuizAnswer
+      } = await import('../models/quizzes')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -728,49 +682,40 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       const { quizId, courseId, answers, timeTaken } = await c.req.json()
 
       // Verificar acceso
-      const { userHasAccess } = await import('../auth-utils')
       const hasAccess = await userHasAccess(c.env.DB, user.id, courseId)
       if (!hasAccess) {
         return c.json({ error: 'No tienes acceso a este curso' }, 403)
       }
 
       // Obtener quiz
-      const quiz = await c.env.DB.prepare(`
-        SELECT * FROM quizzes WHERE id = ? AND course_id = ?
-      `).bind(quizId, courseId).first<any>()
+      const quiz = await getQuiz(c.env.DB, quizId)
 
-      if (!quiz) {
+      if (!quiz || quiz.course_id !== courseId) {
         return c.json({ error: 'Quiz no encontrado' }, 404)
       }
 
       // Verificar intentos máximos
-      const attemptsCount = await c.env.DB.prepare(`
-        SELECT COUNT(*) as count FROM quiz_attempts
-        WHERE quiz_id = ? AND user_id = ?
-      `).bind(quizId, user.id).first<any>()
+      const attempts = await getQuizAttempts(c.env.DB, user.id, quizId)
+      const attemptsCount = attempts.length
 
-      if (quiz.max_attempts && attemptsCount.count >= quiz.max_attempts) {
+      if (quiz.max_attempts && attemptsCount >= quiz.max_attempts) {
         return c.json({ error: 'Has alcanzado el número máximo de intentos' }, 403)
       }
 
       // Obtener todas las preguntas con respuestas correctas
-      const questions = await c.env.DB.prepare(`
-        SELECT * FROM quiz_questions WHERE quiz_id = ?
-      `).bind(quizId).all<any>()
+      const questions = await getQuizQuestions(c.env.DB, quizId)
 
       let totalPoints = 0
       let earnedPoints = 0
       const questionResults = []
 
-      for (const question of (questions.results || [])) {
+      for (const question of questions) {
         totalPoints += question.points
 
         // Obtener respuestas correctas
-        const correctOptions = await c.env.DB.prepare(`
-          SELECT id FROM quiz_options WHERE question_id = ? AND is_correct = 1
-        `).bind(question.id).all<any>()
+        const options = await getQuizOptions(c.env.DB, question.id, false, true)
+        const correctIds = new Set(options.filter(o => o.is_correct).map(o => o.id))
 
-        const correctIds = new Set((correctOptions.results || []).map((o: any) => o.id))
         const userAnswers = answers[question.id] || []
         const userAnswerSet = new Set(userAnswers)
 
@@ -796,42 +741,31 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       const now = new Date().toISOString()
 
       // Crear intento
-      const attemptResult = await c.env.DB.prepare(`
-        INSERT INTO quiz_attempts (
-          quiz_id, user_id, course_id, score, points_earned,
-          total_points, passed, time_taken, started_at, completed_at, answers
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        quizId,
-        user.id,
-        courseId,
+      const attemptResult = await createQuizAttempt(c.env.DB, {
+        quiz_id: quizId,
+        user_id: user.id,
+        course_id: courseId,
         score,
-        earnedPoints,
-        totalPoints,
-        passed ? 1 : 0,
-        timeTaken,
-        now,
-        now,
-        JSON.stringify(answers)
-      ).run()
+        points_earned: earnedPoints,
+        total_points: totalPoints,
+        passed: passed ? 1 : 0,
+        time_taken: timeTaken,
+        started_at: now,
+        completed_at: now,
+        answers: JSON.stringify(answers)
+      })
 
-      const attemptId = attemptResult.meta.last_row_id
+      const attemptId = attemptResult.last_row_id as number
 
       // Guardar respuestas individuales
       for (const result of questionResults) {
-        await c.env.DB.prepare(`
-          INSERT INTO quiz_answers (
-            attempt_id, question_id, selected_options, is_correct, points_earned
-          )
-          VALUES (?, ?, ?, ?, ?)
-        `).bind(
-          attemptId,
-          result.questionId,
-          JSON.stringify(result.selectedOptions),
-          result.isCorrect ? 1 : 0,
-          result.pointsEarned
-        ).run()
+        await createQuizAnswer(c.env.DB, {
+          attempt_id: attemptId,
+          question_id: result.questionId,
+          selected_options: JSON.stringify(result.selectedOptions),
+          is_correct: result.isCorrect ? 1 : 0,
+          points_earned: result.pointsEarned
+        })
       }
 
       return c.json({

@@ -489,10 +489,11 @@ app.post('/versions/:versionId/restore', async (c) => {
 
 // DISCARD DRAFT
 app.get('/:id/discard-draft', async (c) => {
+    const { deleteBlogPostVersion } = await import('../models/blog')
     const id = c.req.param('id')
 
     // Delete ALL versions with status='draft' for this post
-    await c.env.DB.prepare('DELETE FROM blog_post_versions WHERE post_id = ? AND status = ?').bind(id, 'draft').run()
+    await deleteBlogPostVersion(c.env.DB, parseInt(id), 'draft')
 
     return c.redirect('/admin/blog-posts/' + id + '/edit')
 })

@@ -9,7 +9,9 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
   studentRoutes.get('/mi-aprendizaje', async (c) => {
     try {
       // Verificar autenticación
-      const { getCurrentUser } = await import('../auth-utils')
+      const { getCurrentUser, getCourseProgress } = await import('../auth-utils')
+      const { getStudentEnrollmentsWithCourse, getLastAccessedLesson, getCertificate } = await import('../models/enrollments')
+      const { getFirstLesson } = await import('../models/lessons')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -17,55 +19,21 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       // Obtener cursos inscritos con progreso
-      const enrollments = await c.env.DB.prepare(`
-        SELECT
-          pe.id as enrollment_id,
-          pe.enrolled_at,
-          pe.completed,
-          pe.completion_date,
-          c.id as course_id,
-          c.slug,
-          c.title,
-          c.subtitle,
-          c.featured_image,
-          c.duration_weeks,
-          c.level,
-          c.price
-        FROM paid_enrollments pe
-        JOIN courses c ON pe.course_id = c.id
-        WHERE pe.user_id = ? AND pe.payment_status = 'completed' AND pe.access_revoked = 0
-        ORDER BY pe.enrolled_at DESC
-      `).bind(user.id).all<any>()
+      const enrollments = await getStudentEnrollmentsWithCourse(c.env.DB, user.id)
 
       // Calcular progreso de cada curso
       const coursesWithProgress = await Promise.all(
-        (enrollments.results || []).map(async (enrollment: any) => {
-          const { getCourseProgress } = await import('../auth-utils')
+        enrollments.map(async (enrollment: any) => {
           const progress = await getCourseProgress(c.env.DB, user.id, enrollment.course_id)
 
           // Obtener primera lección del curso
-          const firstLesson = await c.env.DB.prepare(`
-            SELECT id FROM lessons
-            WHERE course_id = ? AND published = 1
-            ORDER BY order_index ASC
-            LIMIT 1
-          `).bind(enrollment.course_id).first<any>()
+          const firstLesson = await getFirstLesson(c.env.DB, enrollment.course_id)
 
           // Obtener última lección en progreso (si existe)
-          const lastLesson = await c.env.DB.prepare(`
-            SELECT l.id
-            FROM student_progress sp
-            JOIN lessons l ON sp.lesson_id = l.id
-            WHERE sp.user_id = ? AND sp.course_id = ? AND l.published = 1
-            ORDER BY sp.updated_at DESC
-            LIMIT 1
-          `).bind(user.id, enrollment.course_id).first<any>()
+          const lastLesson = await getLastAccessedLesson(c.env.DB, user.id, enrollment.course_id)
 
           // Obtener certificado si existe
-          const certificate = await c.env.DB.prepare(`
-            SELECT id FROM certificates
-            WHERE user_id = ? AND course_id = ?
-          `).bind(user.id, enrollment.course_id).first<any>()
+          const certificate = await getCertificate(c.env.DB, user.id, enrollment.course_id)
 
           return {
             ...enrollment,
@@ -279,15 +247,16 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
         return c.redirect('/login')
       }
 
+      const { getCourseBySlug } = await import('../models/courses')
+      const { getLessonById, getLessonsByCourseId, getLessonResources } = await import('../models/lessons')
+
       const courseSlug = c.req.param('courseSlug')
       const lessonId = parseInt(c.req.param('lessonId'))
 
       // Obtener información del curso
-      const course = await c.env.DB.prepare(`
-        SELECT id, title, slug FROM courses WHERE slug = ? AND published = 1
-      `).bind(courseSlug).first<any>()
+      const course = await getCourseBySlug(c.env.DB, courseSlug)
 
-      if (!course) {
+      if (!course || !course.published) {
         return c.render(
           <div>
             <section className="section">
@@ -319,11 +288,9 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       // Obtener lección
-      const lesson = await c.env.DB.prepare(`
-        SELECT * FROM lessons WHERE id = ? AND course_id = ? AND published = 1
-      `).bind(lessonId, course.id).first<any>()
+      const lesson = await getLessonById(c.env.DB, lessonId)
 
-      if (!lesson) {
+      if (!lesson || lesson.course_id !== course.id || !lesson.published) {
         return c.render(
           <div>
             <section className="section">
@@ -336,31 +303,21 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
         )
       }
 
+      const { getLessonProgress, getCompletedLessons } = await import('../models/enrollments')
+
       // Obtener progreso del estudiante
-      const progress = await c.env.DB.prepare(`
-        SELECT * FROM student_progress
-        WHERE user_id = ? AND lesson_id = ? AND course_id = ?
-      `).bind(user.id, lessonId, course.id).first<any>()
+      const progress = await getLessonProgress(c.env.DB, user.id, lessonId)
 
       // Obtener todas las lecciones del curso para navegación
-      const allLessons = await c.env.DB.prepare(`
-        SELECT id, module_number, lesson_number, title, video_duration, is_preview
-        FROM lessons
-        WHERE course_id = ? AND published = 1
-        ORDER BY order_index ASC
-      `).bind(course.id).all<any>()
+      const allLessons = await getLessonsByCourseId(c.env.DB, course.id)
 
       // Obtener lecciones completadas
-      const completedLessons = await c.env.DB.prepare(`
-        SELECT lesson_id FROM student_progress
-        WHERE user_id = ? AND course_id = ? AND completed = 1
-      `).bind(user.id, course.id).all<any>()
-
-      const completedIds = new Set((completedLessons.results || []).map((p: any) => p.lesson_id))
+      const completedLessonIds = await getCompletedLessons(c.env.DB, user.id, course.id)
+      const completedIds = new Set(completedLessonIds)
 
       // Agrupar lecciones por módulo
       const moduleMap = new Map()
-      for (const l of (allLessons.results || [])) {
+      for (const l of (allLessons || [])) {
         if (!moduleMap.has(l.module_number)) {
           moduleMap.set(l.module_number, [])
         }
@@ -368,14 +325,12 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       // Encontrar lección anterior y siguiente
-      const currentIndex = (allLessons.results || []).findIndex((l: any) => l.id === lessonId)
-      const prevLesson = currentIndex > 0 ? (allLessons.results || [])[currentIndex - 1] : null
-      const nextLesson = currentIndex < (allLessons.results || []).length - 1 ? (allLessons.results || [])[currentIndex + 1] : null
+      const currentIndex = (allLessons || []).findIndex((l: any) => l.id === lessonId)
+      const prevLesson = currentIndex > 0 ? (allLessons || [])[currentIndex - 1] : null
+      const nextLesson = currentIndex < (allLessons || []).length - 1 ? (allLessons || [])[currentIndex + 1] : null
 
       // Obtener recursos de la lección
-      const resources = await c.env.DB.prepare(`
-        SELECT * FROM lesson_resources WHERE lesson_id = ? ORDER BY created_at ASC
-      `).bind(lessonId).all<any>()
+      const resources = await getLessonResources(c.env.DB, lessonId)
 
       return c.render(
         <div>
@@ -602,12 +557,12 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
                   )}
 
                   {/* Resources */}
-                  {resources.results && resources.results.length > 0 && (
+                  {resources && resources.length > 0 && (
                     <div style="margin-bottom: 40px;">
                       <h2 style="font-size: 1.5rem; color: #1e293b; margin-bottom: 20px;">
                         <i className="fas fa-download"></i> Recursos Descargables
                       </h2>
-                      {resources.results.map((resource: any) => (
+                      {resources.map((resource: any) => (
                         <a href={resource.file_url} target="_blank" rel="noopener noreferrer" className="resource-item" style="text-decoration: none; color: inherit;">
                           <div className="resource-icon">
                             <i className={`fas fa-file-${resource.file_type === 'pdf' ? 'pdf' : resource.file_type === 'video' ? 'video' : 'alt'}`}></i>
@@ -661,13 +616,13 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
                   <div style="margin-bottom: 15px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                       <span style="color: #64748b; font-size: 14px;">Lecciones completadas</span>
-                      <span style="font-weight: 700; color: #1e293b;">{completedIds.size} / {allLessons.results?.length || 0}</span>
+                      <span style="font-weight: 700; color: #1e293b;">{completedIds.size} / {allLessons?.length || 0}</span>
                     </div>
                     <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-                      <div style={`width: ${((completedIds.size / (allLessons.results?.length || 1)) * 100).toFixed(0)}%; height: 100%; background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%); transition: width 0.3s;`}></div>
+                      <div style={`width: ${((completedIds.size / (allLessons?.length || 1)) * 100).toFixed(0)}%; height: 100%; background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%); transition: width 0.3s;`}></div>
                     </div>
                     <p style="text-align: center; margin-top: 10px; font-size: 24px; font-weight: 700; color: #8b5cf6;">
-                      {((completedIds.size / (allLessons.results?.length || 1)) * 100).toFixed(0)}%
+                      {((completedIds.size / (allLessons?.length || 1)) * 100).toFixed(0)}%
                     </p>
                   </div>
                 </div>
@@ -1053,6 +1008,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
   studentRoutes.get('/certificado/:certificateId', async (c) => {
     try {
       const { getCurrentUser } = await import('../auth-utils')
+      const { getCertificateDetails } = await import('../models/enrollments')
       const user = await getCurrentUser(c)
 
       if (!user) {
@@ -1062,22 +1018,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       const certificateId = parseInt(c.req.param('certificateId'))
 
       // Obtener certificado con información del usuario y curso
-      const certificate = await c.env.DB.prepare(`
-        SELECT
-          c.*,
-          u.name as user_name,
-          u.email as user_email,
-          co.title as course_title,
-          co.subtitle as course_subtitle,
-          co.duration_weeks,
-          pe.enrolled_at,
-          pe.completion_date
-        FROM certificates c
-        JOIN users u ON c.user_id = u.id
-        JOIN courses co ON c.course_id = co.id
-        JOIN paid_enrollments pe ON c.enrollment_id = pe.id
-        WHERE c.id = ? AND c.user_id = ?
-      `).bind(certificateId, user.id).first<any>()
+      const certificate = await getCertificateDetails(c.env.DB, certificateId, user.id)
 
       if (!certificate) {
         return c.render(
@@ -1345,21 +1286,21 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
   studentRoutes.get('/cursos/:courseSlug/quiz/:quizId', async (c) => {
     try {
       const { getCurrentUser, userHasAccess } = await import('../auth-utils')
+      const { getQuiz, getQuizAttempts, getQuizQuestions, getQuizOptions } = await import('../models/quizzes')
       const user = await getCurrentUser(c)
 
       if (!user) {
         return c.redirect('/login')
       }
 
+      const { getCourseBySlug } = await import('../models/courses')
       const courseSlug = c.req.param('courseSlug')
       const quizId = parseInt(c.req.param('quizId'))
 
       // Obtener información del curso
-      const course = await c.env.DB.prepare(`
-        SELECT id, title, slug FROM courses WHERE slug = ? AND published = 1
-      `).bind(courseSlug).first<any>()
+      const course = await getCourseBySlug(c.env.DB, courseSlug)
 
-      if (!course) {
+      if (!course || !course.published) {
         return c.render(
           <div>
             <section className="section">
@@ -1391,11 +1332,9 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       // Obtener información del quiz
-      const quiz = await c.env.DB.prepare(`
-        SELECT * FROM quizzes WHERE id = ? AND course_id = ? AND published = 1
-      `).bind(quizId, course.id).first<any>()
+      const quiz = await getQuiz(c.env.DB, quizId)
 
-      if (!quiz) {
+      if (!quiz || quiz.course_id !== course.id || !quiz.published) {
         return c.render(
           <div>
             <section className="section">
@@ -1409,14 +1348,10 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       // Verificar intentos previos
-      const attempts = await c.env.DB.prepare(`
-        SELECT * FROM quiz_attempts
-        WHERE quiz_id = ? AND user_id = ?
-        ORDER BY started_at DESC
-      `).bind(quizId, user.id).all<any>()
+      const attempts = await getQuizAttempts(c.env.DB, user.id, quizId)
 
-      const attemptCount = attempts.results?.length || 0
-      const lastAttempt = attempts.results?.[0]
+      const attemptCount = attempts.length
+      const lastAttempt = attempts[0]
       const canRetake = !quiz.max_attempts || attemptCount < quiz.max_attempts
 
       // Si ya completó y pasó, mostrar resultados
@@ -1425,23 +1360,15 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       // Obtener preguntas con opciones
-      const questions = await c.env.DB.prepare(`
-        SELECT * FROM quiz_questions
-        WHERE quiz_id = ?
-        ORDER BY ${quiz.randomize_questions ? 'RANDOM()' : 'order_index ASC'}
-      `).bind(quizId).all<any>()
+      const questions = await getQuizQuestions(c.env.DB, quizId, !!quiz.randomize_questions)
 
       const questionsWithOptions = await Promise.all(
-        (questions.results || []).map(async (q: any) => {
-          const options = await c.env.DB.prepare(`
-            SELECT id, option_text, order_index FROM quiz_options
-            WHERE question_id = ?
-            ORDER BY ${quiz.randomize_options ? 'RANDOM()' : 'order_index ASC'}
-          `).bind(q.id).all<any>()
+        questions.map(async (q: any) => {
+          const options = await getQuizOptions(c.env.DB, q.id, !!quiz.randomize_options, false)
 
           return {
             ...q,
-            options: options.results || []
+            options
           }
         })
       )
@@ -1787,66 +1714,48 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
   studentRoutes.get('/cursos/:courseSlug/quiz/:quizId/resultado/:attemptId', async (c) => {
     try {
       const { getCurrentUser } = await import('../auth-utils')
+      const { getQuiz, getQuizAttempt, getQuizAnswersDetailed, getQuizOptions } = await import('../models/quizzes')
       const user = await getCurrentUser(c)
 
       if (!user) {
         return c.redirect('/login')
       }
 
+      const { getCourseBySlug } = await import('../models/courses')
       const courseSlug = c.req.param('courseSlug')
       const quizId = parseInt(c.req.param('quizId'))
       const attemptId = parseInt(c.req.param('attemptId'))
 
       // Obtener curso
-      const course = await c.env.DB.prepare(`
-        SELECT id, title, slug FROM courses WHERE slug = ?
-      `).bind(courseSlug).first<any>()
+      const course = await getCourseBySlug(c.env.DB, courseSlug)
 
       if (!course) {
         return c.render(<div><section className="section"><div className="container text-center"><h1>Curso no encontrado</h1></div></section></div>)
       }
 
       // Obtener intento
-      const attempt = await c.env.DB.prepare(`
-        SELECT * FROM quiz_attempts
-        WHERE id = ? AND user_id = ? AND quiz_id = ?
-      `).bind(attemptId, user.id, quizId).first<any>()
+      const attempt = await getQuizAttempt(c.env.DB, attemptId, user.id)
 
-      if (!attempt) {
+      if (!attempt || attempt.quiz_id !== quizId) {
         return c.render(<div><section className="section"><div className="container text-center"><h1>Resultado no encontrado</h1></div></section></div>)
       }
 
       // Obtener quiz
-      const quiz = await c.env.DB.prepare(`
-        SELECT * FROM quizzes WHERE id = ?
-      `).bind(quizId).first<any>()
+      const quiz = await getQuiz(c.env.DB, quizId)
 
       // Obtener respuestas detalladas
-      const answers = await c.env.DB.prepare(`
-        SELECT
-          qa.*,
-          qq.question_text,
-          qq.question_type,
-          qq.explanation,
-          qq.points
-        FROM quiz_answers qa
-        JOIN quiz_questions qq ON qa.question_id = qq.id
-        WHERE qa.attempt_id = ?
-        ORDER BY qq.order_index ASC
-      `).bind(attemptId).all<any>()
+      const answers = await getQuizAnswersDetailed(c.env.DB, attemptId)
 
       // Obtener opciones para cada pregunta
       const detailedAnswers = await Promise.all(
-        (answers.results || []).map(async (answer: any) => {
-          const options = await c.env.DB.prepare(`
-            SELECT * FROM quiz_options WHERE question_id = ? ORDER BY order_index
-          `).bind(answer.question_id).all<any>()
+        answers.map(async (answer: any) => {
+          const options = await getQuizOptions(c.env.DB, answer.question_id, false, true)
 
           const selectedIds = JSON.parse(answer.selected_options)
 
           return {
             ...answer,
-            options: options.results || [],
+            options,
             selectedIds
           }
         })
@@ -2093,23 +2002,19 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       // Obtener información del curso
-      const course = await c.env.DB.prepare(`
-        SELECT id, title, subtitle, price, currency, featured_image, duration_weeks, level
-        FROM courses
-        WHERE id = ? AND published = 1
-      `).bind(courseId).first<any>()
+      const { getCourseById } = await import('../models/courses')
+      const course = await getCourseById(c.env.DB, courseId)
 
-      if (!course) {
+      if (!course || !course.published) {
         return c.redirect('/cursos')
       }
 
-      // Verificar si ya está inscrito
-      const enrollment = await c.env.DB.prepare(`
-        SELECT id FROM paid_enrollments
-        WHERE user_id = ? AND course_id = ? AND payment_status = 'completed'
-      `).bind(user.id, courseId).first<any>()
+      const { userHasAccess } = await import('../auth-utils')
 
-      if (enrollment) {
+      // Verificar si ya está inscrito
+      const hasAccess = await userHasAccess(c.env.DB, user.id, courseId)
+
+      if (hasAccess) {
         return c.redirect('/mi-aprendizaje')
       }
 

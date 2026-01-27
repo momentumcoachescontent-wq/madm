@@ -17,7 +17,7 @@ const app = new Hono<{ Bindings: CloudflareBindings }>()
 app.use('*', adminMiddleware)
 
 // Helper: Dashboard View
-const DashboardHelper = (postsCount: number, usersCount: number, coursesCount: any, lessonsCount: any) => html`
+const DashboardHelper = (postsCount: number, usersCount: number, coursesCount: number, lessonsCount: number) => html`
     <div style="margin-bottom: 40px;">
       <h1 style="font-size: 2.5rem; color: #1e293b; margin-bottom: 10px;">Panel de Administración</h1>
       <p style="color: #64748b; font-size: 1.2rem;">Bienvenido al centro de control de Más Allá del Miedo</p>
@@ -50,7 +50,7 @@ const DashboardHelper = (postsCount: number, usersCount: number, coursesCount: a
           <h2 style="font-size: 1.5rem; margin-bottom: 10px; color: #1e293b;">Gestionar Cursos</h2>
           <p style="color: #64748b;">Administrar cursos, precios y contenido.</p>
           <div style="margin-top: 20px; font-size: 2rem; font-weight: 700; color: #3b82f6;">
-            ${coursesCount?.count || 0} Cursos
+            ${coursesCount} Cursos
           </div>
         </div>
       </a>
@@ -65,7 +65,7 @@ const DashboardHelper = (postsCount: number, usersCount: number, coursesCount: a
           <h2 style="font-size: 1.5rem; margin-bottom: 10px; color: #1e293b;">Gestionar Lecciones</h2>
           <p style="color: #64748b;">Subir videos, editar descripciones y recursos.</p>
           <div style="margin-top: 20px; font-size: 2rem; font-weight: 700; color: #6366f1;">
-            ${lessonsCount?.count || 0} Lecciones
+            ${lessonsCount} Lecciones
           </div>
         </div>
       </a>
@@ -104,12 +104,14 @@ const DashboardHelper = (postsCount: number, usersCount: number, coursesCount: a
 app.get('/', async (c) => {
   const { countBlogPosts } = await import('../models/blog')
   const { countUsers } = await import('../models/users')
+  const { countCourses } = await import('../models/courses')
+  const { countLessons } = await import('../models/lessons')
 
   // Fetch stats
   const postsCount = await countBlogPosts(c.env.DB)
   const usersCount = await countUsers(c.env.DB)
-  const coursesCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM courses').first()
-  const lessonsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM lessons').first()
+  const coursesCount = await countCourses(c.env.DB)
+  const lessonsCount = await countLessons(c.env.DB)
 
   return c.html(AdminLayout({
     title: 'Dashboard',
