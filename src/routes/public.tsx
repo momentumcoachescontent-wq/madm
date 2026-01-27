@@ -1200,44 +1200,9 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
         </section>
 
         <script dangerouslySetInnerHTML={{__html: `
-          document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const messageDiv = document.getElementById('auth-message');
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const originalBtnText = submitBtn.innerHTML;
-
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando sesión...';
-            messageDiv.style.display = 'none';
-
-            const formData = new FormData(e.target);
-
-            try {
-              const response = await fetch('/api/login', {
-                method: 'POST',
-                body: formData
-              });
-
-              const data = await response.json();
-
-              if (data.success) {
-                messageDiv.className = 'auth-message success';
-                messageDiv.textContent = '¡Bienvenido! Redirigiendo...';
-                messageDiv.style.display = 'block';
-
-                setTimeout(() => {
-                  window.location.href = '/mi-aprendizaje';
-                }, 1000);
-              } else {
-                throw new Error(data.error || 'Error al iniciar sesión');
-              }
-            } catch (error) {
-              messageDiv.className = 'auth-message error';
-              messageDiv.textContent = error.message;
-              messageDiv.style.display = 'block';
-              submitBtn.disabled = false;
-              submitBtn.innerHTML = originalBtnText;
+          document.addEventListener('DOMContentLoaded', () => {
+            if (window.ADM && window.ADM.auth) {
+              window.ADM.auth.initLogin();
             }
           });
         `}} />
@@ -1312,44 +1277,9 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
         </section>
 
         <script dangerouslySetInnerHTML={{__html: `
-          document.getElementById('register-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const messageDiv = document.getElementById('auth-message');
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const originalBtnText = submitBtn.innerHTML;
-
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
-            messageDiv.style.display = 'none';
-
-            const formData = new FormData(e.target);
-
-            try {
-              const response = await fetch('/api/register', {
-                method: 'POST',
-                body: formData
-              });
-
-              const data = await response.json();
-
-              if (data.success) {
-                messageDiv.className = 'auth-message success';
-                messageDiv.textContent = '¡Cuenta creada! Redirigiendo...';
-                messageDiv.style.display = 'block';
-
-                setTimeout(() => {
-                  window.location.href = '/mi-aprendizaje';
-                }, 1000);
-              } else {
-                throw new Error(data.error || 'Error al crear cuenta');
-              }
-            } catch (error) {
-              messageDiv.className = 'auth-message error';
-              messageDiv.textContent = error.message;
-              messageDiv.style.display = 'block';
-              submitBtn.disabled = false;
-              submitBtn.innerHTML = originalBtnText;
+          document.addEventListener('DOMContentLoaded', () => {
+            if (window.ADM && window.ADM.auth) {
+              window.ADM.auth.initRegister();
             }
           });
         `}} />
