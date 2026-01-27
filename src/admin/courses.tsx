@@ -200,14 +200,17 @@ app.post('/:id', async (c) => {
   const body = await c.req.parseBody()
 
   try {
+    const price = parseFloat(body.price as string)
+    const durationWeeks = parseInt(body.duration_weeks as string)
+
     await updateCourse(c.env.DB, parseInt(id), {
       title: body.title as string,
       slug: body.slug as string,
       subtitle: body.subtitle as string,
       description: body.description as string,
-      price: parseFloat(body.price as string),
+      price: Number.isFinite(price) ? price : undefined,
       currency: body.currency as string,
-      duration_weeks: parseInt(body.duration_weeks as string),
+      duration_weeks: Number.isFinite(durationWeeks) ? durationWeeks : undefined,
       level: body.level as string,
       featured_image: body.featured_image as string,
       published: body.published ? 1 : 0

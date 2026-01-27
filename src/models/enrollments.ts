@@ -188,7 +188,9 @@ export const getCertificateByCode = async (db: D1Database, code: string): Promis
     `SELECT
       c.*,
       u.name as user_name,
-      co.title as course_title
+      co.title as course_title,
+      co.subtitle as course_subtitle,
+      co.duration_weeks
     FROM certificates c
     JOIN users u ON c.user_id = u.id
     JOIN courses co ON c.course_id = co.id
@@ -320,6 +322,10 @@ export const updateLessonProgress = async (
   courseId: number,
   data: Partial<StudentProgress>
 ) => {
+  if (data.completed === undefined && data.notes === undefined && data.last_position === undefined) {
+    throw new Error("No updatable fields provided")
+  }
+
   const now = new Date().toISOString()
 
   // We use INSERT OR REPLACE or UPSERT syntax. D1 supports ON CONFLICT
