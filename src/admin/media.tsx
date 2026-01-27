@@ -148,13 +148,13 @@ const MediaLibraryHelper = (objects: R2Object[], cursor?: string) => html`
             </div>
           </div>
           <div class="media-actions">
-            <button class="media-action-btn" onclick="copyUrl('${url}')" title="Copiar URL">
+            <button class="media-action-btn" data-url="${url}" title="Copiar URL">
               <i class="fas fa-link"></i>
             </button>
             <a href="${url}" target="_blank" class="media-action-btn" title="Ver / Descargar">
               <i class="fas fa-external-link-alt"></i>
             </a>
-            <button class="media-action-btn delete" onclick="deleteFile('${obj.key}')" title="Eliminar">
+            <button class="media-action-btn delete" data-key="${obj.key}" title="Eliminar">
               <i class="fas fa-trash"></i>
             </button>
           </div>
@@ -164,114 +164,6 @@ const MediaLibraryHelper = (objects: R2Object[], cursor?: string) => html`
   </div>
 
   <div id="toast" class="toast"></div>
-
-  <script>
-    // Copy URL
-    function copyUrl(url) {
-      const fullUrl = window.location.origin + url;
-      navigator.clipboard.writeText(fullUrl).then(() => {
-        showToast('URL copiada al portapapeles');
-      });
-    }
-
-    // Show Toast
-    function showToast(message) {
-      const toast = document.getElementById('toast');
-      toast.textContent = message;
-      toast.style.display = 'block';
-      setTimeout(() => {
-        toast.style.display = 'none';
-      }, 3000);
-    }
-
-    // Delete File
-    async function deleteFile(key) {
-      if (!confirm('¿Estás seguro de eliminar este archivo? Esta acción no se puede deshacer.')) return;
-
-      try {
-        const response = await fetch('/admin/media/' + encodeURIComponent(key), {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          showToast('Archivo eliminado');
-          // Remove element from DOM
-          const el = document.querySelector('.media-item[data-key="' + key + '"]');
-          if (el) el.remove();
-        } else {
-          showToast('Error al eliminar archivo');
-        }
-      } catch (error) {
-        console.error(error);
-        showToast('Error de conexión');
-      }
-    }
-
-    // Upload Handling
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-
-    dropZone.addEventListener('click', () => fileInput.click());
-
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.style.borderColor = '#8b5cf6';
-      dropZone.style.background = '#f5f3ff';
-    });
-
-    dropZone.addEventListener('dragleave', (e) => {
-      e.preventDefault();
-      dropZone.style.borderColor = '#cbd5e1';
-      dropZone.style.background = '#f8fafc';
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.style.borderColor = '#cbd5e1';
-      dropZone.style.background = '#f8fafc';
-
-      if (e.dataTransfer.files.length) {
-        handleFiles(e.dataTransfer.files);
-      }
-    });
-
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files.length) {
-        handleFiles(e.target.files);
-      }
-    });
-
-    async function handleFiles(files) {
-      const originalText = dropZone.querySelector('h3').textContent;
-      dropZone.querySelector('h3').textContent = 'Subiendo ' + files.length + ' archivo(s)...';
-
-      let successCount = 0;
-
-      for (let i = 0; i < files.length; i++) {
-        const formData = new FormData();
-        formData.append('file', files[i]);
-
-        try {
-          const response = await fetch('/admin/upload', {
-            method: 'POST',
-            body: formData
-          });
-
-          if (response.ok) {
-            successCount++;
-          }
-        } catch (error) {
-          console.error('Error uploading:', error);
-        }
-      }
-
-      showToast(successCount + ' archivo(s) subido(s) con éxito');
-      dropZone.querySelector('h3').textContent = originalText;
-
-      // Reload page to show new files
-      setTimeout(() => window.location.reload(), 1000);
-    }
-  </script>
 `
 
 // Routes

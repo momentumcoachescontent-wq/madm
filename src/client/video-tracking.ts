@@ -2,7 +2,7 @@
 export function initVideoTracking(lessonId: number, courseId: number, lastPosition: number, videoDuration: number) {
   let currentVideoTime = 0;
   let currentVideoDuration = videoDuration || 0;
-  let videoReady = false;
+  // let videoReady = false; // Removed unused variable
   let videoProgressInterval: any;
 
   const saveVideoProgress = async (position: number, duration: number) => {
@@ -54,7 +54,7 @@ export function initVideoTracking(lessonId: number, courseId: number, lastPositi
       new (window as any).YT.Player(iframe, {
         events: {
           'onReady': function(event: any) {
-            videoReady = true;
+            // videoReady = true;
             currentVideoDuration = event.target.getDuration();
 
             if (lastPosition > 0 && lastPosition < currentVideoDuration - 5) {
@@ -128,7 +128,7 @@ export function initVideoTracking(lessonId: number, courseId: number, lastPositi
     function setupVimeoPlayer() {
       const player = new (window as any).Vimeo.Player(iframe);
       player.ready().then(() => {
-        videoReady = true;
+        // videoReady = true;
         player.getDuration().then((duration: number) => {
           currentVideoDuration = duration;
           if (lastPosition > 0 && lastPosition < duration - 5) {
@@ -161,7 +161,7 @@ export function initVideoTracking(lessonId: number, courseId: number, lastPositi
     if (!video) return;
 
     video.addEventListener('loadedmetadata', () => {
-      videoReady = true;
+      // videoReady = true;
       currentVideoDuration = video.duration;
       if (lastPosition > 0 && lastPosition < video.duration - 5) {
         video.currentTime = lastPosition;
@@ -305,5 +305,20 @@ export function initNotes(lessonId: number, courseId: number) {
   const btn = document.getElementById('saveNotesBtn');
   if (btn) {
     btn.addEventListener('click', saveNotes);
+  }
+}
+
+export function init() {
+  const config = document.getElementById('video-config');
+  if (config) {
+    const lessonId = parseInt(config.dataset.lessonId!);
+    const courseId = parseInt(config.dataset.courseId!);
+    const lastPosition = parseInt(config.dataset.lastPosition!);
+    const duration = parseInt(config.dataset.duration!);
+    const isCompleted = config.dataset.isCompleted === 'true';
+
+    initVideoTracking(lessonId, courseId, lastPosition, duration);
+    initCompletion(lessonId, courseId, isCompleted);
+    initNotes(lessonId, courseId);
   }
 }

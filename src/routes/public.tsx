@@ -1199,13 +1199,6 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
           </div>
         </section>
 
-        <script dangerouslySetInnerHTML={{__html: `
-          document.addEventListener('DOMContentLoaded', () => {
-            if (window.ADM && window.ADM.auth) {
-              window.ADM.auth.initLogin();
-            }
-          });
-        `}} />
       </div>
     )
   })
@@ -1276,13 +1269,6 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
           </div>
         </section>
 
-        <script dangerouslySetInnerHTML={{__html: `
-          document.addEventListener('DOMContentLoaded', () => {
-            if (window.ADM && window.ADM.auth) {
-              window.ADM.auth.initRegister();
-            }
-          });
-        `}} />
       </div>
     )
   })

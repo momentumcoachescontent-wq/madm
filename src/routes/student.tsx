@@ -510,7 +510,6 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
                     </div>
                     <button
                       id="completeBtn"
-                      onclick="toggleComplete()"
                       className="btn btn-success"
                       style={`white-space: nowrap; ${progress?.completed ? 'background: #10b981;' : 'background: #64748b;'}`}
                     >
@@ -658,27 +657,14 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
             </div>
           </div>
 
-          <script dangerouslySetInnerHTML={{__html: `
-            document.addEventListener('DOMContentLoaded', () => {
-              if (window.ADM && window.ADM.video) {
-                window.ADM.video.initVideoTracking(
-                  ${lessonId},
-                  ${course.id},
-                  ${progress?.last_position || 0},
-                  ${lesson.video_duration || 0}
-                );
-                window.ADM.video.initCompletion(
-                  ${lessonId},
-                  ${course.id},
-                  ${progress?.completed ? 'true' : 'false'}
-                );
-                window.ADM.video.initNotes(
-                  ${lessonId},
-                  ${course.id}
-                );
-              }
-            });
-          `}} />
+          <div id="video-config"
+            style="display: none;"
+            data-lesson-id={lessonId}
+            data-course-id={course.id}
+            data-last-position={progress?.last_position || 0}
+            data-duration={lesson.video_duration || 0}
+            data-is-completed={progress?.completed ? 'true' : 'false'}
+          ></div>
         </div>
       )
     } catch (error) {
@@ -1273,18 +1259,13 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
             </form>
           </div>
 
-          <script dangerouslySetInnerHTML={{__html: `
-            document.addEventListener('DOMContentLoaded', () => {
-              if (window.ADM && window.ADM.quiz) {
-                window.ADM.quiz.initQuiz(
-                  ${quizId},
-                  ${course.id},
-                  ${quiz.time_limit || 0},
-                  ${JSON.stringify(courseSlug)}
-                );
-              }
-            });
-          `}} />
+          <div id="quiz-config"
+            style="display: none;"
+            data-quiz-id={quizId}
+            data-course-id={course.id}
+            data-time-limit={quiz.time_limit || 0}
+            data-slug={courseSlug}
+          ></div>
         </div>
       )
     } catch (error) {
@@ -1635,7 +1616,6 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
                     <button
                       id="select-stripe"
                       className="payment-method-btn active"
-                      onclick="selectPaymentMethod('stripe')"
                       style="flex: 1; padding: 20px; border: 2px solid #8b5cf6; border-radius: 12px; background: white; cursor: pointer; transition: all 0.3s;"
                     >
                       <i className="fab fa-cc-stripe fa-2x" style="color: #635bff; margin-bottom: 10px;"></i>
@@ -1646,7 +1626,6 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
                     <button
                       id="select-paypal"
                       className="payment-method-btn"
-                      onclick="selectPaymentMethod('paypal')"
                       style="flex: 1; padding: 20px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; transition: all 0.3s;"
                     >
                       <i className="fab fa-paypal fa-2x" style="color: #0070ba; margin-bottom: 10px;"></i>
@@ -1770,19 +1749,14 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
           </section>
 
           <script src="https://js.stripe.com/v3/"></script>
-          <script dangerouslySetInnerHTML={{__html: `
-            document.addEventListener('DOMContentLoaded', () => {
-              if (window.ADM && window.ADM.stripe) {
-                window.ADM.stripe.initCheckout({
-                  stripeKey: '${c.env.STRIPE_PUBLISHABLE_KEY}',
-                  paypalClientId: '${c.env.PAYPAL_CLIENT_ID}',
-                  courseId: ${courseId},
-                  currency: '${course.currency}',
-                  price: ${course.price}
-                });
-              }
-            });
-          `}} />
+          <div id="checkout-config"
+            style="display: none;"
+            data-stripe-key={c.env.STRIPE_PUBLISHABLE_KEY}
+            data-paypal-client-id={c.env.PAYPAL_CLIENT_ID}
+            data-course-id={courseId}
+            data-currency={course.currency}
+            data-price={course.price}
+          ></div>
         </div>
       )
     } catch (error) {

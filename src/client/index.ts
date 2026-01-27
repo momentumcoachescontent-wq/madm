@@ -22,5 +22,9 @@ window.ADM = {
 document.addEventListener('DOMContentLoaded', () => {
   auth.checkAuth();
   auth.initLogout();
+  auth.init();
+  stripe.init();
+  quiz.init();
   certificate.initCertificate();
+  video.init();
 });

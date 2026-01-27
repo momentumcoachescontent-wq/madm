@@ -110,8 +110,23 @@ export function initQuiz(quizId: number, courseId: number, timeLimit: number, sl
 
   // Prevent accidental exit
   window.addEventListener('beforeunload', (e) => {
-    // Standard behavior shows prompt
-    e.preventDefault();
-    e.returnValue = '';
+    // Only warn if quiz is active (not submitted)
+    // We can check if submit button is disabled (submitted)
+    const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+    if (!submitBtn.disabled) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
   });
+}
+
+export function init() {
+  const config = document.getElementById('quiz-config');
+  if (config) {
+    const quizId = parseInt(config.dataset.quizId!);
+    const courseId = parseInt(config.dataset.courseId!);
+    const timeLimit = parseInt(config.dataset.timeLimit!);
+    const slug = config.dataset.slug!;
+    initQuiz(quizId, courseId, timeLimit, slug);
+  }
 }
