@@ -34,6 +34,8 @@ export interface QuizOption {
   order_index: number
 }
 
+export type QuizOptionWithoutCorrect = Omit<QuizOption, 'is_correct'>
+
 export interface QuizAttempt {
   id: number
   quiz_id: number
@@ -80,14 +82,20 @@ export const getQuizQuestions = async (db: D1Database, quizId: number, randomize
 /**
  * Get options for a question
  */
-export const getQuizOptions = async (db: D1Database, questionId: number, randomize: boolean = false, includeCorrect: boolean = true): Promise<QuizOption[]> => {
+export async function getQuizOptions(db: D1Database, questionId: number, randomize: boolean, includeCorrect: false): Promise<QuizOptionWithoutCorrect[]>
+export async function getQuizOptions(db: D1Database, questionId: number, randomize?: boolean, includeCorrect?: true): Promise<QuizOption[]>
+export async function getQuizOptions(db: D1Database, questionId: number, randomize: boolean = false, includeCorrect: boolean = true): Promise<QuizOption[] | QuizOptionWithoutCorrect[]> {
   let query = 'SELECT id, question_id, option_text, order_index'
   if (includeCorrect) {
     query += ', is_correct'
   }
   query += ` FROM quiz_options WHERE question_id = ? ORDER BY ${randomize ? 'RANDOM()' : 'order_index ASC'}`
 
-  return await dbAll<QuizOption>(db, query, [questionId])
+  if (includeCorrect) {
+    return await dbAll<QuizOption>(db, query, [questionId])
+  } else {
+    return await dbAll<QuizOptionWithoutCorrect>(db, query, [questionId])
+  }
 }
 
 /**

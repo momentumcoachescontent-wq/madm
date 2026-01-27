@@ -181,11 +181,21 @@ export class VersioningService {
   compareText(oldText: string, newText: string): string {
     const diff = Diff.diffWords(oldText || '', newText || '')
 
+    const escapeHtml = (unsafe: string) => {
+      return unsafe
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+    }
+
     return diff.map(part => {
       const color = part.added ? '#dcfce7' : part.removed ? '#fee2e2' : 'transparent'
       const textDecoration = part.removed ? 'line-through' : 'none'
       const fontWeight = part.added ? 'bold' : 'normal'
-      return `<span style="background-color: ${color}; text-decoration: ${textDecoration}; font-weight: ${fontWeight}">${part.value}</span>`
+      const escapedValue = escapeHtml(part.value)
+      return `<span style="background-color: ${color}; text-decoration: ${textDecoration}; font-weight: ${fontWeight}">${escapedValue}</span>`
     }).join('')
   }
 }
