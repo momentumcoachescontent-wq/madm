@@ -10,7 +10,21 @@ import { registerWebhookRoutes } from './routes/webhooks'
 
 const app = new Hono<{ Bindings: CloudflareBindings }>()
 
-app.use('/api/*', cors())
+app.use(
+  '/api/*',
+  cors({
+    // IMPORTANT: If you use cookies/sessions via fetch, you need an explicit origin:
+    origin: [
+      'https://madm-7sb.pages.dev/',
+      // add your custom domain too if you have one:
+      // 'https://yourdomain.com'
+    ],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+)
+
 app.use(renderer)
 
 registerWebhookRoutes(app)
