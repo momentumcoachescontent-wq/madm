@@ -26,6 +26,78 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
     })
   })
 
+  // Sitemap XML
+  publicRoutes.get('/sitemap.xml', async (c) => {
+    try {
+      const { listBlogPosts } = await import('../models/blog')
+      const { listPublishedCourses } = await import('../models/courses')
+
+      // Get Base URL
+      const url = new URL(c.req.url)
+      const baseUrl = `${url.protocol}//${url.host}`
+
+      // Static Routes
+      const staticRoutes = [
+        '/',
+        '/el-libro',
+        '/metodo',
+        '/recursos-gratuitos',
+        '/contacto',
+        '/comunidad',
+        '/sobre-nosotros',
+        '/login',
+        '/registro',
+        '/blog',
+        '/cursos'
+      ]
+
+      // Dynamic Routes
+      const posts = await listBlogPosts(c.env.DB, { publishedOnly: true })
+      const courses = await listPublishedCourses(c.env.DB)
+
+      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+      xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+
+      // Add Static
+      staticRoutes.forEach(path => {
+        xml += '  <url>\n'
+        xml += `    <loc>${baseUrl}${path}</loc>\n`
+        xml += '    <changefreq>weekly</changefreq>\n'
+        xml += '    <priority>0.8</priority>\n'
+        xml += '  </url>\n'
+      })
+
+      // Add Blog Posts
+      posts.forEach((post: any) => {
+        xml += '  <url>\n'
+        xml += `    <loc>${baseUrl}/blog/${post.slug}</loc>\n`
+        xml += `    <lastmod>${new Date(post.updated_at || post.created_at).toISOString().split('T')[0]}</lastmod>\n`
+        xml += '    <changefreq>monthly</changefreq>\n'
+        xml += '    <priority>0.6</priority>\n'
+        xml += '  </url>\n'
+      })
+
+      // Add Courses
+      courses.forEach((course: any) => {
+        xml += '  <url>\n'
+        xml += `    <loc>${baseUrl}/cursos/${course.slug}</loc>\n`
+        xml += `    <lastmod>${new Date(course.updated_at || course.created_at).toISOString().split('T')[0]}</lastmod>\n`
+        xml += '    <changefreq>weekly</changefreq>\n'
+        xml += '    <priority>0.9</priority>\n'
+        xml += '  </url>\n'
+      })
+
+      xml += '</urlset>'
+
+      return c.text(xml, 200, {
+        'Content-Type': 'application/xml'
+      })
+    } catch (error) {
+      console.error('Error generating sitemap:', error)
+      return c.text('Error generating sitemap', 500)
+    }
+  })
+
   // Página de Inicio
   publicRoutes.get('/', (c) => {
     return c.render(
