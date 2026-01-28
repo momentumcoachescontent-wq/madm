@@ -5,6 +5,19 @@ import { HeroSection } from '../views/components/HeroSection'
 import { Card } from '../views/components/Card'
 import { Button } from '../views/components/Button'
 
+function escapeXml(unsafe: string): string {
+  return unsafe.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case '<': return '&lt;'
+      case '>': return '&gt;'
+      case '&': return '&amp;'
+      case '\'': return '&apos;'
+      case '"': return '&quot;'
+      default: return c
+    }
+  })
+}
+
 export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   const publicRoutes = new Hono<{ Bindings: CloudflareBindings }>()
 
@@ -34,7 +47,7 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
 
       // Get Base URL
       const url = new URL(c.req.url)
-      const baseUrl = `${url.protocol}//${url.host}`
+      const baseUrl = escapeXml(`${url.protocol}//${url.host}`)
 
       // Static Routes
       const staticRoutes = [
@@ -58,10 +71,22 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
       let xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
       xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
 
+      // Helper for safe date
+      const getSafeDate = (d1: string | null | undefined, d2: string | null | undefined) => {
+        const timestamp = d1 || d2
+        if (timestamp) {
+          const date = new Date(timestamp)
+          if (!isNaN(date.getTime())) {
+            return date.toISOString().split('T')[0]
+          }
+        }
+        return new Date().toISOString().split('T')[0]
+      }
+
       // Add Static
       staticRoutes.forEach(path => {
         xml += '  <url>\n'
-        xml += `    <loc>${baseUrl}${path}</loc>\n`
+        xml += `    <loc>${baseUrl}${escapeXml(path)}</loc>\n`
         xml += '    <changefreq>weekly</changefreq>\n'
         xml += '    <priority>0.8</priority>\n'
         xml += '  </url>\n'
@@ -70,8 +95,8 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
       // Add Blog Posts
       posts.forEach((post: any) => {
         xml += '  <url>\n'
-        xml += `    <loc>${baseUrl}/blog/${post.slug}</loc>\n`
-        xml += `    <lastmod>${new Date(post.updated_at || post.created_at).toISOString().split('T')[0]}</lastmod>\n`
+        xml += `    <loc>${baseUrl}/blog/${escapeXml(post.slug)}</loc>\n`
+        xml += `    <lastmod>${getSafeDate(post.updated_at, post.created_at)}</lastmod>\n`
         xml += '    <changefreq>monthly</changefreq>\n'
         xml += '    <priority>0.6</priority>\n'
         xml += '  </url>\n'
@@ -80,8 +105,8 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
       // Add Courses
       courses.forEach((course: any) => {
         xml += '  <url>\n'
-        xml += `    <loc>${baseUrl}/cursos/${course.slug}</loc>\n`
-        xml += `    <lastmod>${new Date(course.updated_at || course.created_at).toISOString().split('T')[0]}</lastmod>\n`
+        xml += `    <loc>${baseUrl}/cursos/${escapeXml(course.slug)}</loc>\n`
+        xml += `    <lastmod>${getSafeDate(course.updated_at, course.created_at)}</lastmod>\n`
         xml += '    <changefreq>weekly</changefreq>\n'
         xml += '    <priority>0.9</priority>\n'
         xml += '  </url>\n'
