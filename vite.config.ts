@@ -24,16 +24,8 @@ export default defineConfig(({ mode }) => {
 }
   }
 
-  return {
-    plugins: [
-      pages(),
-      devServer({
-        entry: 'src/index.tsx'
-      })
-    ],
-    build: {
-      outDir: 'dist',
-      emptyOutDir: true
-    }
-  }
-})
+ return {
+  base: '/',
+  plugins: [ ... ],
+  build: { ... }
+}
