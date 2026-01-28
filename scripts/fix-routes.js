@@ -18,30 +18,29 @@ try {
   const content = fs.readFileSync(routesPath, 'utf-8')
   const routes = JSON.parse(content)
 
-  // Ensure include exists (defensive)
-  if (!Array.isArray(routes.include) || routes.include.length === 0) {
-    routes.include = ['/*']
+  // Ensure include/exclude exist
+  if (!Array.isArray(routes.include)) routes.include = ['/*']
+  if (!Array.isArray(routes.exclude)) routes.exclude = []
+
+  // Always route app pages through Worker
+  if (!routes.include.includes('/*')) routes.include = ['/*']
+
+  // Ensure static assets are excluded (served as static)
+  const mustExclude = ['/assets/*', '/static/*', '/favicon.ico']
+  for (const p of mustExclude) {
+    if (!routes.exclude.includes(p)) routes.exclude.push(p)
   }
 
-  // Ensure exclude list exists
-  if (!Array.isArray(routes.exclude)) {
-    routes.exclude = []
-  }
-
-  // Ensure static assets are excluded from Worker routing
-  const requiredExcludes = ['/assets/*', '/static/*']
-  for (const rule of requiredExcludes) {
-    if (!routes.exclude.includes(rule)) routes.exclude.push(rule)
-  }
-
-  // CRITICAL: remove accidental admin exclusions
-  const blockedAdmin = new Set(['/admin', '/admin/', '/admin/*'])
-  routes.exclude = routes.exclude.filter((p) => !blockedAdmin.has(p))
+  // IMPORTANT: Never exclude admin or api routes (they must reach the Worker)
+  routes.exclude = routes.exclude.filter((p) => {
+    const s = String(p)
+    return !s.startsWith('/admin') && !s.startsWith('/api')
+  })
 
   fs.writeFileSync(routesPath, JSON.stringify(routes, null, 2))
   console.log('Updated _routes.json successfully.')
-  console.log('include:', routes.include)
-  console.log('exclude:', routes.exclude)
+  console.log('Final include:', routes.include)
+  console.log('Final exclude:', routes.exclude)
 } catch (error) {
   console.error('Error processing _routes.json:', error)
   process.exit(1)
