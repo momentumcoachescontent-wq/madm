@@ -63,7 +63,7 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
 
       return c.json({
         success: true,
-        message: 'Gracias por suscribirte. Recibirás el recurso en tu email.',
+        message: '¡Listo! Tu descarga comenzará automáticamente. Si no inicia, revisa tu bloqueador de popups o vuelve a intentarlo.',
         downloadUrl
       })
     } catch (error) {
