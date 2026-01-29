@@ -6,7 +6,7 @@
     "dev:sandbox": "wrangler pages dev dist --ip 0.0.0.0 --port 3000",
     "dev:d1": "wrangler pages dev dist --d1=mas-alla-del-miedo-db --local --ip 0.0.0.0 --port 3000",
     "build:css": "tailwindcss -i ./src/style.css -o ./public/static/style.css --minify",
-    "build": "echo STEP1_CSS && npm run build:css && echo STEP2_SSR && vite build && echo STEP3_CLIENT && vite build --mode client && echo STEP4_FIXROUTES && node scripts/fix-routes.js",
+    "build": "npm run build:css && vite build && vite build --mode client && node scripts/fix-routes.js",
     "preview": "wrangler pages dev dist",
     "deploy": "npm run build && wrangler pages deploy dist",
     "deploy:prod": "npm run build && wrangler pages deploy dist --project-name madm",
