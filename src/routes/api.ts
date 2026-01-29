@@ -61,10 +61,32 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
 
       const downloadUrl = resource && typeof resource === 'string' ? resources[resource] : null
 
+      // Enviar email con el recurso
+      let emailSent = false
+      if (downloadUrl && c.env.RESEND_API_KEY && c.env.FROM_EMAIL) {
+        try {
+          const urlObj = new URL(c.req.url)
+          const origin = urlObj.origin
+          const absoluteUrl = new URL(downloadUrl, origin).toString()
+
+          const { sendResourceEmail } = await import('../services/email')
+          emailSent = await sendResourceEmail(
+            email as string,
+            resource as string,
+            absoluteUrl,
+            c.env.RESEND_API_KEY,
+            c.env.FROM_EMAIL
+          )
+        } catch (e) {
+          console.error('Error initiating email send:', e)
+        }
+      }
+
       return c.json({
         success: true,
         message: '¡Listo! Tu descarga comenzará automáticamente. Si no inicia, revisa tu bloqueador de popups o vuelve a intentarlo.',
-        downloadUrl
+        downloadUrl,
+        emailSent
       })
     } catch (error) {
       console.error('Error al guardar suscriptor:', error)
