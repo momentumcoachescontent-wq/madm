@@ -10,4 +10,5 @@ export type CloudflareBindings = {
   PAYPAL_WEBHOOK_ID: string
   RESEND_API_KEY: string
   FROM_EMAIL: string
+  BASE_URL: string
 }

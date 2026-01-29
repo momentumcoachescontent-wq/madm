@@ -59,7 +59,8 @@ describe('API Subscription', () => {
     }, {
       DB: mockDB,
       RESEND_API_KEY: 'test-key',
-      FROM_EMAIL: 'from@test.com'
+      FROM_EMAIL: 'from@test.com',
+      BASE_URL: 'http://localhost:8787'
     })
 
     expect(res.status).toBe(200)

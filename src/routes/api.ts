@@ -65,8 +65,7 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       let emailSent = false
       if (downloadUrl && c.env.RESEND_API_KEY && c.env.FROM_EMAIL) {
         try {
-          const urlObj = new URL(c.req.url)
-          const origin = urlObj.origin
+          const origin = c.env.BASE_URL || 'https://mas-alla-del-miedo.pages.dev'
           const absoluteUrl = new URL(downloadUrl, origin).toString()
 
           const { sendResourceEmail } = await import('../services/email')
