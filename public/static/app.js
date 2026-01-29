@@ -47,6 +47,10 @@ document.addEventListener('DOMContentLoaded', function() {
       const button = this.querySelector('button[type="submit"]');
       const originalText = button.innerHTML;
       
+      // Limpiar mensajes anteriores
+      const existingMsg = this.querySelector('.auth-message');
+      if (existingMsg) existingMsg.remove();
+
       button.disabled = true;
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
       
@@ -56,16 +60,46 @@ document.addEventListener('DOMContentLoaded', function() {
           body: formData
         });
         
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch (err) {
+          throw new Error('Respuesta inválida del servidor');
+        }
         
-        if (data.success) {
-          alert('✅ ' + data.message);
+        if (response.ok && data.success) {
+          // Mostrar mensaje de éxito en el DOM
+          const msgDiv = document.createElement('div');
+          msgDiv.className = 'auth-message success';
+          msgDiv.style.marginTop = '15px';
+          msgDiv.innerHTML = '✅ ' + (data.message || 'Suscripción exitosa');
+          this.appendChild(msgDiv);
+
           this.reset();
+
+          // Manejar descarga automática
+          if (data.downloadUrl) {
+            const win = window.open(data.downloadUrl, "_blank", "noopener");
+            if (!win || win.closed || typeof win.closed === 'undefined') {
+              // Si el popup fue bloqueado, usar redirección
+              window.location.href = data.downloadUrl;
+            }
+          }
         } else {
-          alert('❌ ' + (data.error || 'Error al procesar suscripción'));
+          // Mostrar error del servidor
+          const msgDiv = document.createElement('div');
+          msgDiv.className = 'auth-message error';
+          msgDiv.style.marginTop = '15px';
+          msgDiv.innerHTML = '❌ ' + (data.error || 'Error al procesar suscripción');
+          this.appendChild(msgDiv);
         }
       } catch (error) {
-        alert('❌ Error de conexión. Por favor, intenta de nuevo.');
+        // Mostrar error de conexión/parsing
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'auth-message error';
+        msgDiv.style.marginTop = '15px';
+        msgDiv.innerHTML = '❌ Error de conexión. Por favor, intenta de nuevo.';
+        this.appendChild(msgDiv);
       } finally {
         button.disabled = false;
         button.innerHTML = originalText;
