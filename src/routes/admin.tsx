@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import adminApp from '../admin'
+import adminApp from '../admin/index'
 import { CloudflareBindings } from '../types'
 
 export function registerAdminRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
