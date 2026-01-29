@@ -7,6 +7,9 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "vars": {
+    "BASE_URL": "http://localhost:3000"
+  },
   "d1_databases": [
     {
       "binding": "DB",
