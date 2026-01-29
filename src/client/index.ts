@@ -25,7 +25,7 @@ function safeRun(name: string, fn: () => void) {
   try {
     fn();
   } catch (err) {
-    console.error(`[client:init] ${name} failed`, err);
+    console.error(`[client_init] ${name} failed`, err);
   }
 }
 
