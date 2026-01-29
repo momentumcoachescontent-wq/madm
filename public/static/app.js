@@ -72,17 +72,28 @@ document.addEventListener('DOMContentLoaded', function() {
           const msgDiv = document.createElement('div');
           msgDiv.className = 'auth-message success';
           msgDiv.style.marginTop = '15px';
-          msgDiv.innerHTML = '✅ ' + (data.message || 'Suscripción exitosa');
+          msgDiv.textContent = '✅ ' + (data.message || 'Suscripción exitosa');
           this.appendChild(msgDiv);
 
           this.reset();
 
           // Manejar descarga automática
           if (data.downloadUrl) {
-            const win = window.open(data.downloadUrl, "_blank", "noopener");
-            if (!win || win.closed || typeof win.closed === 'undefined') {
-              // Si el popup fue bloqueado, usar redirección
-              window.location.href = data.downloadUrl;
+            try {
+              const url = new URL(data.downloadUrl, window.location.origin);
+              if (['http:', 'https:', 'blob:'].includes(url.protocol)) {
+                const win = window.open(data.downloadUrl, "_blank", "noopener");
+                if (!win || win.closed || typeof win.closed === 'undefined') {
+                  // Si el popup fue bloqueado, usar redirección
+                  window.location.href = data.downloadUrl;
+                }
+              } else {
+                console.error("Invalid download URL");
+                alert("Invalid download URL");
+              }
+            } catch (e) {
+              console.error("Invalid download URL");
+              alert("Invalid download URL");
             }
           }
         } else {
@@ -90,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const msgDiv = document.createElement('div');
           msgDiv.className = 'auth-message error';
           msgDiv.style.marginTop = '15px';
-          msgDiv.innerHTML = '❌ ' + (data.error || 'Error al procesar suscripción');
+          msgDiv.textContent = '❌ ' + (data.error || 'Error al procesar suscripción');
           this.appendChild(msgDiv);
         }
       } catch (error) {
