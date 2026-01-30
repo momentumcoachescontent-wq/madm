@@ -27,7 +27,30 @@ export function sanitizeHtml(html: string): string {
       blockquote: ['class'], pre: ['class'], code: ['class']
     },
     stripIgnoreTag: true, // Filter out tags not in whitelist
-    stripIgnoreTagBody: ['script', 'style'] // Remove content of script/style tags
+    stripIgnoreTagBody: ['script', 'style'], // Remove content of script/style tags
+    css: {
+      whiteList: {
+        'color': true,
+        'background-color': true,
+        'font-weight': true,
+        'font-style': true,
+        'font-size': true,
+        'text-align': true,
+        'text-decoration': true,
+        'width': true,
+        'height': true,
+        'margin': true,
+        'margin-top': true,
+        'margin-right': true,
+        'margin-bottom': true,
+        'margin-left': true,
+        'padding': true,
+        'padding-top': true,
+        'padding-right': true,
+        'padding-bottom': true,
+        'padding-left': true,
+      }
+    }
   }
 
   return xss(html, options)
