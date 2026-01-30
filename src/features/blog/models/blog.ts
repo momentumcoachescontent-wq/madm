@@ -1,5 +1,5 @@
 import { dbFirst, dbAll, dbRun } from '../../../models/db'
-import sanitizeHtml from 'sanitize-html'
+import { sanitizeHtml } from '../../../lib/sanitize'
 
 export interface BlogPost {
   id: number
