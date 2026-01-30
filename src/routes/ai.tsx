@@ -74,7 +74,7 @@ export function registerAiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       // Si insertó o actualizó, changes > 0.
       // Si no hizo nada (límite alcanzado en el WHERE del UPDATE), changes == 0.
       if (result.meta.changes && result.meta.changes > 0) {
-        return c.redirect('https://opal.google/?flow=drive:/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_&shared&mode=app')
+        return c.redirect('https://opal.google/app/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_?shared')
       } else {
         return c.render(
           <AiLimitReachedPage userType={userType} limit={limit} />

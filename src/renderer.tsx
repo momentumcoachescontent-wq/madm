@@ -41,7 +41,6 @@ export const renderer = jsxRenderer(({ children }) => {
                 <a href="/metodo">Método</a>
                 <a href="/recursos-gratuitos">Recursos Gratuitos</a>
                 <a href="/cursos">Cursos</a>
-                <a href="/asistente-ia" target="_blank" rel="noopener noreferrer">Asistente IA</a>
                 <a href="/comunidad">Comunidad</a>
                 <a href="/blog">Blog</a>
                 <a href="/sobre-nosotros">Sobre Nosotros</a>
