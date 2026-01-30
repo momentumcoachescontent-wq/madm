@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { CloudflareBindings } from '../types'
-import sanitizeHtml from 'sanitize-html'
+import { sanitizeHtml } from '../lib/sanitize'
 import { HeroSection } from '../views/components/HeroSection'
 import { Card } from '../views/components/Card'
 import { Button } from '../views/components/Button'
