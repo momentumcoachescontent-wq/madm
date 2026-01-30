@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createBlogPost, NewBlogPost } from '../src/features/blog/models/blog'
 import { VersioningService } from '../src/lib/versioning'
 import { dbRun } from '../src/models/db'
+import { sanitizeHtml } from '../src/lib/sanitize'
 
 // Mock dbRun for createBlogPost
 vi.mock('../src/models/db', () => ({
@@ -11,6 +12,34 @@ vi.mock('../src/models/db', () => ({
 }))
 
 describe('Blog Features', () => {
+  describe('Sanitizer Logic (xss)', () => {
+     it('should strip script tags', () => {
+         const dirty = '<script>alert(1)</script>Hello'
+         const clean = sanitizeHtml(dirty)
+         expect(clean).toBe('Hello')
+     })
+
+     it('should strip script tags with spaces in end tag', () => {
+         const dirty = '<script>alert(1)</script >Hello'
+         const clean = sanitizeHtml(dirty)
+         expect(clean).toBe('Hello')
+     })
+
+     it('should strip event handlers', () => {
+         const dirty = '<a href="#" onclick="alert(1)">Link</a>'
+         const clean = sanitizeHtml(dirty)
+         expect(clean).toContain('Link')
+         expect(clean).not.toContain('onclick')
+     })
+
+     it('should strip javascript: protocol', () => {
+         const dirty = '<a href="javascript:alert(1)">Link</a>'
+         const clean = sanitizeHtml(dirty)
+         expect(clean).not.toContain('javascript:')
+         // xss library usually removes the attribute or sets it to #
+     })
+  })
+
   describe('Sanitization in createBlogPost', () => {
     let mockDB: D1Database
 

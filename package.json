@@ -29,7 +29,8 @@
     "diff": "^8.0.3",
     "hono": "^4.10.7",
     "stripe": "^20.1.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xss": "^1.0.15"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250705.0",
