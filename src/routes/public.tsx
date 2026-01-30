@@ -637,24 +637,21 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
             </div>
 
             <div className="resources-list">
-              <div className="resource-detail-card">
-                <div className="resource-icon">
-                  <i className="fas fa-robot fa-4x"></i>
-                </div>
-                <div className="resource-content">
-                  <h3>Asistente Virtual IA</h3>
-                  <p className="resource-type">
-                    <span className="badge">Herramienta Interactiva</span>
-                    <span className="badge">Acceso Inmediato</span>
-                  </p>
-                  <p>
-                    Un chatbot inteligente diseñado para analizar tu situación actual y ofrecerte recomendaciones personalizadas basadas en el método "Más Allá del Miedo".
-                  </p>
-                  <a href="https://opal.google/?flow=drive:/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_&shared&mode=app" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
-                    <i className="fas fa-comments"></i> Iniciar Análisis
-                  </a>
-                </div>
+            {/* New AI Tool Banner */}
+            <div style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); border-radius: 12px; padding: 30px; margin-bottom: 50px; color: white; display: flex; align-items: center; gap: 30px; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3); flex-wrap: wrap;">
+              <div style="flex: 0 0 80px; text-align: center;">
+                 <i className="fas fa-robot fa-4x"></i>
               </div>
+              <div style="flex: 1; min-width: 250px;">
+                 <h3 style="font-size: 1.5rem; margin-bottom: 10px; color: white;">Nuevo: Analiza tu caso con IA</h3>
+                 <p style="opacity: 0.9;">Cuéntale tu situación a nuestro asistente inteligente y recibe un análisis inmediato y recomendaciones personalizadas.</p>
+              </div>
+              <div>
+                 <a href="https://opal.google/?flow=drive:/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_&shared&mode=app" target="_blank" rel="noopener noreferrer" className="btn btn-light">
+                   <i className="fas fa-arrow-right"></i> Probar Ahora
+                 </a>
+              </div>
+            </div>
 
               <div className="resource-detail-card">
                 <div className="resource-icon">
@@ -731,22 +728,6 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
                   </form>
                 </div>
               </div>
-
-            {/* New AI Tool Banner */}
-            <div style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); border-radius: 12px; padding: 30px; margin-bottom: 50px; color: white; display: flex; align-items: center; gap: 30px; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3); flex-wrap: wrap;">
-              <div style="flex: 0 0 80px; text-align: center;">
-                 <i className="fas fa-robot fa-4x"></i>
-              </div>
-              <div style="flex: 1; min-width: 250px;">
-                 <h3 style="font-size: 1.5rem; margin-bottom: 10px; color: white;">Nuevo: Analiza tu caso con IA</h3>
-                 <p style="opacity: 0.9;">Cuéntale tu situación a nuestro asistente inteligente y recibe un análisis inmediato y recomendaciones personalizadas.</p>
-              </div>
-              <div>
-                 <a href="https://opal.google/?flow=drive:/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_&shared&mode=app" target="_blank" rel="noopener noreferrer" className="btn btn-light">
-                   <i className="fas fa-arrow-right"></i> Probar Ahora
-                 </a>
-              </div>
-            </div>
 
               <div className="resource-detail-card">
                 <div className="resource-icon">
