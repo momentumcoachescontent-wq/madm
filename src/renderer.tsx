@@ -41,7 +41,7 @@ export const renderer = jsxRenderer(({ children }) => {
                 <a href="/metodo">Método</a>
                 <a href="/recursos-gratuitos">Recursos Gratuitos</a>
                 <a href="/cursos">Cursos</a>
-                <a href="https://opal.google/?flow=drive:/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_&shared&mode=app" target="_blank" rel="noopener noreferrer">Asistente IA</a>
+                <a href="/asistente-ia" target="_blank" rel="noopener noreferrer">Asistente IA</a>
                 <a href="/comunidad">Comunidad</a>
                 <a href="/blog">Blog</a>
                 <a href="/sobre-nosotros">Sobre Nosotros</a>
@@ -148,7 +148,7 @@ export const renderer = jsxRenderer(({ children }) => {
         </footer>
 
         {/* Floating AI Button */}
-        <a href="https://opal.google/?flow=drive:/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_&shared&mode=app" target="_blank" rel="noopener noreferrer" className="floating-ai" aria-label="Asistente IA">
+        <a href="/asistente-ia" target="_blank" rel="noopener noreferrer" className="floating-ai" aria-label="Asistente IA">
           <i className="fas fa-robot"></i>
           <span>Asistente IA</span>
         </a>
