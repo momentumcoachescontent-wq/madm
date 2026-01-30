@@ -17,7 +17,7 @@ However, **two critical areas** were identified that require immediate attention
 ## 2. Vulnerability Summary
 
 | ID | Severity | Category | Description | Status |
-|----|----------|----------|-------------|--------|
+| ---- | ---------- | ---------- | ------------- | -------- |
 | VULN-001 | **High** | XSS | Stored Cross-Site Scripting in Lesson Content | Open |
 | VULN-002 | **High** | Dependency | Known vulnerabilities in `hono` (Auth Bypass, XSS) | Open |
 | VULN-003 | **Moderate** | Dependency | Denial of Service risk in `undici` (via `wrangler`) | Open |
@@ -39,9 +39,9 @@ However, **two critical areas** were identified that require immediate attention
 ### VULN-002: Dependency Vulnerabilities (Hono)
 *   **Location:** `package.json` / `node_modules`
 *   **Description:** `npm audit` reported high-severity vulnerabilities in `hono <= 4.11.6`.
-    *   **JWT Algorithm Confusion:** Allows token forgery.
-    *   **XSS in ErrorBoundary:** Reflected XSS.
-    *   **Arbitrary Key Read:** In Serve Static middleware.
+  *   **JWT Algorithm Confusion:** Allows token forgery.
+  *   **XSS in ErrorBoundary:** Reflected XSS.
+  *   **Arbitrary Key Read:** In Serve Static middleware.
 *   **Impact:** Potential for authentication bypass (if using JWT middleware) or XSS.
 *   **Remediation:** Update `hono` to the latest version (`npm install hono@latest`).
 
@@ -72,12 +72,12 @@ However, **two critical areas** were identified that require immediate attention
 ## 5. Recommended Action Plan
 
 1.  **Immediate Fixes:**
-    *   Run `npm install hono@latest` to patch the framework vulnerabilities.
-    *   Modify `src/routes/student.tsx` to use `sanitizeHtml(lesson.content)` inside the `dangerouslySetInnerHTML` block.
+  *   Run `npm install hono@latest` to patch the framework vulnerabilities.
+  *   Modify `src/routes/student.tsx` to use `sanitizeHtml(lesson.content)` inside the `dangerouslySetInnerHTML` block.
 
 2.  **Short Term:**
-    *   Run `npm audit fix` to address remaining dependency issues.
-    *   Refactor `src/models/users.ts` to return a `User` type that excludes `password_hash` by default.
+  *   Run `npm audit fix` to address remaining dependency issues.
+  *   Refactor `src/models/users.ts` to return a `User` type that excludes `password_hash` by default.
 
 3.  **Long Term:**
-    *   Implement Content Security Policy (CSP) headers in `src/index.tsx` (via Hono middleware) to restrict script sources and further mitigate XSS risks.
+  *   Implement Content Security Policy (CSP) headers in `src/index.tsx` (via Hono middleware) to restrict script sources and further mitigate XSS risks.
