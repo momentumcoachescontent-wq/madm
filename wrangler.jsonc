@@ -3,7 +3,6 @@
   "name": "madm",
   "compatibility_date": "2025-11-26",
   "pages_build_output_dir": "dist",
-  "pages_build_command": "npm run build",
   "compatibility_flags": [
     "nodejs_compat"
   ],
