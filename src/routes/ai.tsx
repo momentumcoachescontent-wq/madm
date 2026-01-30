@@ -46,43 +46,40 @@ export function registerAiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
         }
       }
 
-      // 3. Consultar Uso Diario
+      // 3. Upsert y Verificación de Límite (Atomic)
       const today = new Date().toISOString().split('T')[0]
-
-      let usageQuery = ''
-      let usageParams: any[] = []
+      let result
 
       if (userId) {
-        usageQuery = `SELECT * FROM daily_ai_usage WHERE user_id = ? AND usage_date = ?`
-        usageParams = [userId, today]
+        // Logged-in user: Conflict on (user_id, usage_date)
+        result = await c.env.DB.prepare(
+          `INSERT INTO daily_ai_usage (user_id, ip_address, usage_date, count)
+           VALUES (?, ?, ?, 1)
+           ON CONFLICT (user_id, usage_date) WHERE user_id IS NOT NULL
+           DO UPDATE SET count = daily_ai_usage.count + 1, updated_at = CURRENT_TIMESTAMP
+           WHERE daily_ai_usage.count < ?`
+        ).bind(userId, ipAddress, today, limit).run()
       } else {
-        usageQuery = `SELECT * FROM daily_ai_usage WHERE user_id IS NULL AND ip_address = ? AND usage_date = ?`
-        usageParams = [ipAddress, today]
+        // Anonymous user: Conflict on (ip_address, usage_date)
+        result = await c.env.DB.prepare(
+          `INSERT INTO daily_ai_usage (user_id, ip_address, usage_date, count)
+           VALUES (NULL, ?, ?, 1)
+           ON CONFLICT (ip_address, usage_date) WHERE user_id IS NULL
+           DO UPDATE SET count = daily_ai_usage.count + 1, updated_at = CURRENT_TIMESTAMP
+           WHERE daily_ai_usage.count < ?`
+        ).bind(ipAddress, today, limit).run()
       }
 
-      const usageRecord = await c.env.DB.prepare(usageQuery).bind(...usageParams).first<{ id: number, count: number }>()
-      const currentCount = usageRecord ? usageRecord.count : 0
-
-      // 4. Verificar Límite
-      if (currentCount >= limit) {
+      // 4. Verificar resultado
+      // Si insertó o actualizó, changes > 0.
+      // Si no hizo nada (límite alcanzado en el WHERE del UPDATE), changes == 0.
+      if (result.meta.changes && result.meta.changes > 0) {
+        return c.redirect('https://opal.google/?flow=drive:/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_&shared&mode=app')
+      } else {
         return c.render(
           <AiLimitReachedPage userType={userType} limit={limit} />
         )
       }
-
-      // 5. Registrar Uso
-      if (usageRecord) {
-        await c.env.DB.prepare(
-          `UPDATE daily_ai_usage SET count = count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-        ).bind(usageRecord.id).run()
-      } else {
-        await c.env.DB.prepare(
-          `INSERT INTO daily_ai_usage (user_id, ip_address, usage_date, count) VALUES (?, ?, ?, 1)`
-        ).bind(userId, ipAddress, today).run()
-      }
-
-      // 6. Redirigir a la Herramienta
-      return c.redirect('https://opal.google/?flow=drive:/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_&shared&mode=app')
 
     } catch (error) {
       console.error('Error en ruta de IA:', error)
