@@ -12,6 +12,11 @@ describe('sanitizeHtml', () => {
     expect(sanitizeHtml(input)).toBe('<p>Safe</p>')
   })
 
+  it('should strip link tags', () => {
+    const input = '<link rel="stylesheet" href="style.css">'
+    expect(sanitizeHtml(input)).toBe('')
+  })
+
   it('should strip on* attributes', () => {
     const input = '<img src="http://example.com/x.png" onerror="alert(1)" />'
     // xss might preserve self-closing style or add space
