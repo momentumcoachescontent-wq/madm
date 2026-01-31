@@ -66,8 +66,9 @@ export const processStoryApproval = async (db: D1Database, bucket: R2Bucket, sto
     storyText = storySection.text().trim()
   } else {
     // If we fallback to body, we should ideally exclude analysis if it exists separately
-    // But simple fallback is body text
-    storyText = $('body').text().trim()
+    const bodyClone = $('body').clone()
+    bodyClone.find('section[data-madm="analysis"]').remove()
+    storyText = bodyClone.text().trim()
   }
 
   // Analysis
@@ -79,8 +80,9 @@ export const processStoryApproval = async (db: D1Database, bucket: R2Bucket, sto
     $('meta[name="madm:excerpt"]').attr('content') ||
     $('meta[name="description"]').attr('content')
 
-  if (!excerpt && storyText) {
-    excerpt = storyText.substring(0, 200).trim() + (storyText.length > 200 ? '...' : '')
+  if (!excerpt) {
+    const trimmed = storyText?.trim() ?? ''
+    excerpt = trimmed ? trimmed.substring(0, 200).trim() + (trimmed.length > 200 ? '...' : '') : ''
   }
 
   // Thumbnail
@@ -101,6 +103,8 @@ export const processStoryApproval = async (db: D1Database, bucket: R2Bucket, sto
       analysis_text = ?,
       excerpt = ?,
       thumbnail_url = ?,
+      meta_title = ?,
+      meta_author = ?,
       published_at = CURRENT_TIMESTAMP,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
@@ -112,6 +116,8 @@ export const processStoryApproval = async (db: D1Database, bucket: R2Bucket, sto
     analysisText,
     excerpt,
     thumbnail,
+    title,
+    author,
     storyId
   ])
 

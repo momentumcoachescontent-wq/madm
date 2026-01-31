@@ -19,7 +19,6 @@ export function sanitizeHtml(html: string): string {
       body: ['class', 'style'],
       title: [],
       meta: ['name', 'content', 'property', 'charset'],
-      link: ['rel', 'href', 'type', 'media'], // Allow stylesheets if needed, or remove if strict
 
       // Semantic tags
       section: ['class', 'style', 'data-madm'],
