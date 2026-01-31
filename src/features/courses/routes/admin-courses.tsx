@@ -18,29 +18,29 @@ const CourseForm = (course: any = {}) => {
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">Título</label>
-          <input type="text" name="title" value="${course.title || ''}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+          <input type="text" name="title" value="${course.title ?? ''}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
         </div>
 
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">Slug</label>
-          <input type="text" name="slug" value="${course.slug || ''}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+          <input type="text" name="slug" value="${course.slug ?? ''}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
         </div>
       </div>
 
       <div class="form-group" style="margin-top: 15px;">
         <label style="display: block; margin-bottom: 5px; font-weight: 600;">Subtítulo</label>
-        <input type="text" name="subtitle" value="${course.subtitle || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+        <input type="text" name="subtitle" value="${course.subtitle ?? ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
       </div>
 
       <div class="form-group" style="margin-top: 15px;">
         <label style="display: block; margin-bottom: 5px; font-weight: 600;">Descripción</label>
-        <textarea name="description" rows="4" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">${course.description || ''}</textarea>
+        <textarea name="description" rows="4" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">${course.description ?? ''}</textarea>
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 15px;">
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">Precio</label>
-          <input type="number" step="0.01" name="price" value="${course.price || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+          <input type="number" step="0.01" name="price" value="${course.price ?? ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
         </div>
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">Moneda</label>
@@ -52,7 +52,7 @@ const CourseForm = (course: any = {}) => {
         </div>
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">Duración (Semanas)</label>
-          <input type="number" name="duration_weeks" value="${course.duration_weeks || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+          <input type="number" name="duration_weeks" value="${course.duration_weeks ?? ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
         </div>
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">Nivel</label>
@@ -67,7 +67,7 @@ const CourseForm = (course: any = {}) => {
 
       <div class="form-group" style="margin-top: 15px;">
         <label style="display: block; margin-bottom: 5px; font-weight: 600;">Imagen Destacada (URL)</label>
-        <input type="text" name="featured_image" value="${course.featured_image || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+        <input type="text" name="featured_image" value="${course.featured_image ?? ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
       </div>
 
       <div class="form-group" style="margin-top: 20px;">
