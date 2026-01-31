@@ -6,9 +6,9 @@
 export const dbFirst = async <T = unknown>(
   db: D1Database,
   query: string,
-  args: any[] = []
+  args: unknown[] = []
 ): Promise<T | null> => {
-  return await db.prepare(query).bind(...args).first<T>()
+  return await db.prepare(query).bind(...(args as any[])).first<T>()
 }
 
 /**
@@ -18,9 +18,9 @@ export const dbFirst = async <T = unknown>(
 export const dbAll = async <T = unknown>(
   db: D1Database,
   query: string,
-  args: any[] = []
+  args: unknown[] = []
 ): Promise<T[]> => {
-  const result = await db.prepare(query).bind(...args).all<T>()
+  const result = await db.prepare(query).bind(...(args as any[])).all<T>()
   return result.results
 }
 
@@ -31,8 +31,8 @@ export const dbAll = async <T = unknown>(
 export const dbRun = async (
   db: D1Database,
   query: string,
-  args: any[] = []
+  args: unknown[] = []
 ): Promise<D1Meta> => {
-  const result = await db.prepare(query).bind(...args).run()
+  const result = await db.prepare(query).bind(...(args as any[])).run()
   return result.meta
 }

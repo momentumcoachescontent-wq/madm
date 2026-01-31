@@ -74,7 +74,7 @@ export async function getEnrollmentByPaymentId(
   paymentId: string,
   provider: 'stripe' | 'paypal'
 ) {
-  return await modelGetEnrollmentByPaymentId(db, paymentId, provider)
+  return modelGetEnrollmentByPaymentId(db, paymentId, provider)
 }
 
 /**
@@ -109,7 +109,7 @@ export async function createEnrollmentFromWebhook(
   })
 
   // We can't fetch by ID directly without dbFirst, but getEnrollmentByPaymentId works
-  return await getEnrollmentByPaymentId(db, data.paymentId, data.provider)
+  return getEnrollmentByPaymentId(db, data.paymentId, data.provider)
 }
 
 /**

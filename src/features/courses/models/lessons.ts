@@ -49,14 +49,14 @@ export interface LessonResource {
  * Get a lesson by ID
  */
 export const getLessonById = async (db: D1Database, id: number): Promise<Lesson | null> => {
-  return await dbFirst<Lesson>(db, 'SELECT * FROM lessons WHERE id = ?', [id])
+  return dbFirst<Lesson>(db, 'SELECT * FROM lessons WHERE id = ?', [id])
 }
 
 /**
  * List all lessons (Admin view with Course Title)
  */
 export const listLessons = async (db: D1Database): Promise<Lesson[]> => {
-  return await dbAll<Lesson>(
+  return dbAll<Lesson>(
     db,
     `SELECT l.*, c.title as course_title
      FROM lessons l
@@ -78,7 +78,7 @@ export const getLessonsByCourseId = async (db: D1Database, courseId: number, pub
   // Let's stick to that but maybe also sort by module/lesson if order_index matches?
   query += ' ORDER BY order_index ASC, module_number ASC, lesson_number ASC'
 
-  return await dbAll<Lesson>(db, query, [courseId])
+  return dbAll<Lesson>(db, query, [courseId])
 }
 
 /**
@@ -88,7 +88,7 @@ export const createLesson = async (db: D1Database, lesson: NewLesson) => {
   // Auto-calculate order_index if not provided
   const orderIndex = lesson.order_index ?? (lesson.module_number * 1000 + lesson.lesson_number)
 
-  return await dbRun(
+  return dbRun(
     db,
     `INSERT INTO lessons (
       course_id, module_number, lesson_number, title, description,
@@ -100,10 +100,10 @@ export const createLesson = async (db: D1Database, lesson: NewLesson) => {
       lesson.module_number,
       lesson.lesson_number,
       lesson.title,
-      lesson.description || null,
-      lesson.video_url || null,
+      lesson.description ?? null,
+      lesson.video_url ?? null,
       lesson.video_duration || 0,
-      lesson.content || null,
+      lesson.content ?? null,
       lesson.is_preview ? 1 : 0,
       lesson.published ? 1 : 0,
       orderIndex
@@ -146,7 +146,7 @@ export const updateLesson = async (db: D1Database, id: number, lesson: Partial<N
   const query = `UPDATE lessons SET ${updates.join(', ')} WHERE id = ?`
   args.push(id)
 
-  return await dbRun(db, query, args)
+  return dbRun(db, query, args)
 }
 
 /**
@@ -161,7 +161,7 @@ export const countLessons = async (db: D1Database): Promise<number> => {
  * Get resources for a lesson
  */
 export const getLessonResources = async (db: D1Database, lessonId: number): Promise<LessonResource[]> => {
-  return await dbAll<LessonResource>(
+  return dbAll<LessonResource>(
     db,
     'SELECT * FROM lesson_resources WHERE lesson_id = ? ORDER BY created_at ASC',
     [lessonId]
@@ -173,7 +173,7 @@ export const getLessonResources = async (db: D1Database, lessonId: number): Prom
  */
 export const getFirstLesson = async (db: D1Database, courseId: number): Promise<Lesson | null> => {
   // Try order_index first, then fallback to module/lesson
-  return await dbFirst<Lesson>(
+  return dbFirst<Lesson>(
     db,
     'SELECT * FROM lessons WHERE course_id = ? AND published = 1 ORDER BY order_index ASC LIMIT 1',
     [courseId]

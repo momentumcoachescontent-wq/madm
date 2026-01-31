@@ -64,7 +64,7 @@ export interface QuizAnswer {
  * Get a quiz by ID
  */
 export const getQuiz = async (db: D1Database, id: number): Promise<Quiz | null> => {
-  return await dbFirst<Quiz>(db, 'SELECT * FROM quizzes WHERE id = ?', [id])
+  return dbFirst<Quiz>(db, 'SELECT * FROM quizzes WHERE id = ?', [id])
 }
 
 /**
@@ -72,7 +72,7 @@ export const getQuiz = async (db: D1Database, id: number): Promise<Quiz | null> 
  */
 export const getQuizQuestions = async (db: D1Database, quizId: number, randomize: boolean = false): Promise<QuizQuestion[]> => {
   const orderBy = randomize ? 'RANDOM()' : 'order_index ASC'
-  return await dbAll<QuizQuestion>(
+  return dbAll<QuizQuestion>(
     db,
     `SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY ${orderBy}`,
     [quizId]
@@ -92,9 +92,9 @@ export async function getQuizOptions(db: D1Database, questionId: number, randomi
   query += ` FROM quiz_options WHERE question_id = ? ORDER BY ${randomize ? 'RANDOM()' : 'order_index ASC'}`
 
   if (includeCorrect) {
-    return await dbAll<QuizOption>(db, query, [questionId])
+    return dbAll<QuizOption>(db, query, [questionId])
   } else {
-    return await dbAll<QuizOptionWithoutCorrect>(db, query, [questionId])
+    return dbAll<QuizOptionWithoutCorrect>(db, query, [questionId])
   }
 }
 
@@ -102,7 +102,7 @@ export async function getQuizOptions(db: D1Database, questionId: number, randomi
  * Get quiz attempts for a user
  */
 export const getQuizAttempts = async (db: D1Database, userId: number, quizId: number): Promise<QuizAttempt[]> => {
-  return await dbAll<QuizAttempt>(
+  return dbAll<QuizAttempt>(
     db,
     'SELECT * FROM quiz_attempts WHERE quiz_id = ? AND user_id = ? ORDER BY started_at DESC',
     [quizId, userId]
@@ -113,7 +113,7 @@ export const getQuizAttempts = async (db: D1Database, userId: number, quizId: nu
  * Get a specific quiz attempt
  */
 export const getQuizAttempt = async (db: D1Database, attemptId: number, userId: number): Promise<QuizAttempt | null> => {
-  return await dbFirst<QuizAttempt>(
+  return dbFirst<QuizAttempt>(
     db,
     'SELECT * FROM quiz_attempts WHERE id = ? AND user_id = ?',
     [attemptId, userId]
@@ -124,7 +124,7 @@ export const getQuizAttempt = async (db: D1Database, attemptId: number, userId: 
  * Create a quiz attempt
  */
 export const createQuizAttempt = async (db: D1Database, attempt: Partial<QuizAttempt>) => {
-  return await dbRun(
+  return dbRun(
     db,
     `INSERT INTO quiz_attempts (
       quiz_id, user_id, course_id, score, points_earned,
@@ -151,7 +151,7 @@ export const createQuizAttempt = async (db: D1Database, attempt: Partial<QuizAtt
  * Create a quiz answer record
  */
 export const createQuizAnswer = async (db: D1Database, answer: Partial<QuizAnswer>) => {
-  return await dbRun(
+  return dbRun(
     db,
     `INSERT INTO quiz_answers (
       attempt_id, question_id, selected_options, is_correct, points_earned
@@ -171,7 +171,7 @@ export const createQuizAnswer = async (db: D1Database, answer: Partial<QuizAnswe
  * Get detailed answers for an attempt (Joined with questions)
  */
 export const getQuizAnswersDetailed = async (db: D1Database, attemptId: number): Promise<any[]> => {
-  return await dbAll<any>(
+  return dbAll<any>(
     db,
     `SELECT
       qa.*,

@@ -41,7 +41,7 @@ export interface ListBlogPostsOptions {
  * Get a blog post by ID
  */
 export const getBlogPostById = async (db: D1Database, id: number): Promise<BlogPost | null> => {
-  return await dbFirst<BlogPost>(db, 'SELECT * FROM blog_posts WHERE id = ?', [id])
+  return dbFirst<BlogPost>(db, 'SELECT * FROM blog_posts WHERE id = ?', [id])
 }
 
 /**
@@ -54,7 +54,7 @@ export const getBlogPostBySlug = async (db: D1Database, slug: string, opts: { pu
     query += " AND published = 1 AND (scheduled_at IS NULL OR scheduled_at <= datetime('now'))"
   }
 
-  return await dbFirst<BlogPost>(db, query, [slug])
+  return dbFirst<BlogPost>(db, query, [slug])
 }
 
 /**
@@ -98,7 +98,7 @@ export const listBlogPosts = async (db: D1Database, opts: ListBlogPostsOptions =
     args.push(opts.offset)
   }
 
-  return await dbAll<BlogPost>(db, query, args)
+  return dbAll<BlogPost>(db, query, args)
 }
 
 /**
@@ -124,7 +124,7 @@ export const countBlogPosts = async (db: D1Database, opts: { publishedOnly?: boo
  * Create a new blog post
  */
 export const createBlogPost = async (db: D1Database, post: NewBlogPost) => {
-  return await dbRun(
+  return dbRun(
     db,
     `INSERT INTO blog_posts (title, slug, content, excerpt, image_url, hashtags, published, scheduled_at, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
@@ -167,26 +167,26 @@ export const updateBlogPost = async (db: D1Database, id: number, post: UpdateBlo
   const query = `UPDATE blog_posts SET ${updates.join(', ')} WHERE id = ?`
   args.push(id)
 
-  return await dbRun(db, query, args)
+  return dbRun(db, query, args)
 }
 
 /**
  * Increment blog post views
  */
 export const incrementBlogPostViews = async (db: D1Database, id: number) => {
-  return await dbRun(db, 'UPDATE blog_posts SET views = views + 1 WHERE id = ?', [id])
+  return dbRun(db, 'UPDATE blog_posts SET views = views + 1 WHERE id = ?', [id])
 }
 
 /**
  * Delete a blog post
  */
 export const deleteBlogPost = async (db: D1Database, id: number) => {
-  return await dbRun(db, 'DELETE FROM blog_posts WHERE id = ?', [id])
+  return dbRun(db, 'DELETE FROM blog_posts WHERE id = ?', [id])
 }
 
 /**
  * Delete blog post versions
  */
 export const deleteBlogPostVersion = async (db: D1Database, postId: number, status: string) => {
-  return await dbRun(db, 'DELETE FROM blog_post_versions WHERE post_id = ? AND status = ?', [postId, status])
+  return dbRun(db, 'DELETE FROM blog_post_versions WHERE post_id = ? AND status = ?', [postId, status])
 }
