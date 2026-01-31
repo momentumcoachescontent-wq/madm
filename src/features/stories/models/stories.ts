@@ -60,10 +60,10 @@ export const listStories = async (db: D1Database, filters: ListStoriesFilters = 
 
   query += ` ORDER BY created_at DESC`
 
-  if (filters.limit) {
+  if (filters.limit != null) {
     query += ` LIMIT ?`
     args.push(filters.limit)
-    if (filters.offset) {
+    if (filters.offset != null) {
       query += ` OFFSET ?`
       args.push(filters.offset)
     }
@@ -77,7 +77,8 @@ export const getStory = async (db: D1Database, id: number) => {
 }
 
 export const updateStoryStatus = async (db: D1Database, id: number, status: 'approved' | 'rejected') => {
-  return await dbRun(db, `UPDATE stories SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, id])
+  const result = await dbRun(db, `UPDATE stories SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, id])
+  return result.changes
 }
 
 export const countStories = async (db: D1Database, filters: { status?: string } = {}) => {

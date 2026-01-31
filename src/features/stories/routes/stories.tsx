@@ -29,8 +29,23 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
         return c.text('Invalid file type. Only .html is allowed.', 400)
       }
 
+      // Check Size
+      const maxBytes = c.env.MAX_UPLOAD_BYTES ? parseInt(c.env.MAX_UPLOAD_BYTES) : 2 * 1024 * 1024
+      if (file.size > maxBytes) {
+        return c.text('File too large', 413)
+      }
+
       // Read content for metadata extraction
       const content = await file.text()
+
+      // Validate Metadata
+      const hasTitle = /<meta\s+name="madm:title"\s+content="[^"]*"/i.test(content)
+      const hasAuthor = /<meta\s+name="madm:author"\s+content="[^"]*"/i.test(content)
+      const hasStorySection = /<section\s+data-madm="story"/i.test(content)
+
+      if (!hasTitle || !hasAuthor || !hasStorySection) {
+        return c.text('Invalid file format. Missing required metadata or sections.', 400)
+      }
 
       // Extract Metadata using Regex
       const titleMatch = content.match(/<meta\s+name="madm:title"\s+content="([^"]*)"/i)
@@ -55,20 +70,31 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
       const userId = user ? user.id : null
 
       // Get IP
-      let ipAddress = c.req.header('CF-Connecting-IP') ?? 'unknown'
+      let ipAddress: string | null = c.req.header('CF-Connecting-IP') ?? 'unknown'
       if (ipAddress === 'unknown' && c.req.header('host')?.includes('localhost')) {
         ipAddress = '127.0.0.1'
       }
 
+      const storeIp = c.env.STORE_CLIENT_IP === 'true'
+      if (!storeIp) {
+        ipAddress = null
+      }
+
       // Create DB Record
-      await createStory(c.env.DB, {
-        user_id: userId,
-        r2_key: r2Key,
-        original_filename: file.name,
-        meta_title,
-        meta_author,
-        ip_address: ipAddress
-      })
+      try {
+        await createStory(c.env.DB, {
+          user_id: userId,
+          r2_key: r2Key,
+          original_filename: file.name,
+          meta_title,
+          meta_author,
+          ip_address: ipAddress
+        })
+      } catch (e) {
+        // Cleanup R2
+        await c.env.IMAGES_BUCKET.delete(r2Key)
+        throw e
+      }
 
       // Return Success View
       return c.render(

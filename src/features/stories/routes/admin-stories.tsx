@@ -33,7 +33,10 @@ const StatusBadge = (status: string) => {
 
 // LIST Stories
 app.get('/', async (c) => {
-  const page = parseInt(c.req.query('page') || '1')
+  let page = parseInt(c.req.query('page') || '1')
+  if (Number.isNaN(page) || page < 1) {
+    page = 1
+  }
   const status = c.req.query('status')
   const limit = 20
   const offset = (page - 1) * limit
@@ -137,6 +140,9 @@ app.get('/', async (c) => {
 // UPDATE Status
 app.post('/:id/status', async (c) => {
   const id = parseInt(c.req.param('id'))
+  if (Number.isNaN(id)) {
+    return c.text('Invalid id', 400)
+  }
   const body = await c.req.parseBody()
   const status = body['status'] as 'approved' | 'rejected'
 
@@ -144,7 +150,11 @@ app.post('/:id/status', async (c) => {
     return c.text('Invalid status', 400)
   }
 
-  await updateStoryStatus(c.env.DB, id, status)
+  const changes = await updateStoryStatus(c.env.DB, id, status)
+
+  if (!changes) {
+    return c.text('Story not found', 404)
+  }
 
   // Redirect back to list
   return c.redirect('/admin/stories?status=pending')
