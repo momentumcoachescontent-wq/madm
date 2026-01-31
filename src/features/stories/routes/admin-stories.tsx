@@ -139,10 +139,11 @@ app.get('/', async (c) => {
 
 // UPDATE Status
 app.post('/:id/status', async (c) => {
-  const id = parseInt(c.req.param('id'))
-  if (Number.isNaN(id)) {
+  const idStr = c.req.param('id')
+  if (!/^\d+$/.test(idStr)) {
     return c.text('Invalid id', 400)
   }
+  const id = Number(idStr)
   const body = await c.req.parseBody()
   const status = body['status'] as 'approved' | 'rejected'
 
