@@ -1,8 +1,12 @@
 import { Hono } from 'hono'
 import { CloudflareBindings } from '../types'
+import adminStoriesApi from '../features/stories/routes/admin-api'
 
 export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   const apiRoutes = new Hono<{ Bindings: CloudflareBindings }>()
+
+  // Mount Admin Stories API
+  apiRoutes.route('/admin/stories', adminStoriesApi)
 
   // ===== API ENDPOINTS =====
 
