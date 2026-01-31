@@ -1,8 +1,12 @@
 import { Hono } from 'hono'
 import { CloudflareBindings } from '../types'
+import { storyApiRoutes } from '../features/stories/routes/api'
 
 export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   const apiRoutes = new Hono<{ Bindings: CloudflareBindings }>()
+
+  // Mount Feature APIs
+  apiRoutes.route('/stories', storyApiRoutes)
 
   // ===== API ENDPOINTS =====
 
