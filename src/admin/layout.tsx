@@ -17,6 +17,7 @@ export const AdminLayout = (props: LayoutProps) => {
     { id: 'lessons', label: 'Lecciones', icon: 'fas fa-play-circle', href: '/admin/lessons' },
     { id: 'users', label: 'Usuarios', icon: 'fas fa-users', href: '/admin/users' },
     { id: 'media', label: 'Media', icon: 'fas fa-images', href: '/admin/media' },
+    { id: 'stories', label: 'Historias', icon: 'fas fa-book-open', href: '/admin/stories' },
   ]
 
   return html`<!DOCTYPE html>

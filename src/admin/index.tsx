@@ -9,6 +9,7 @@ import mediaApp from './media'
 import usersApp from './users'
 import coursesApp from './courses'
 import lessonsApp from './lessons'
+import storiesApp from '../features/stories/routes/admin-stories'
 
 // Define Bindings if needed for types, though usually generic is enough for composition
 const app = new Hono<{ Bindings: CloudflareBindings }>()
@@ -127,5 +128,6 @@ app.route('/media', mediaApp)
 app.route('/users', usersApp)
 app.route('/courses', coursesApp)
 app.route('/lessons', lessonsApp)
+app.route('/stories', storiesApp)
 
 export default app

@@ -8,6 +8,7 @@ import { registerAdminRoutes } from './routes/admin'
 import { registerApiRoutes } from './routes/api'
 import { registerWebhookRoutes } from './routes/webhooks'
 import { registerAiRoutes } from './routes/ai'
+import { registerStoriesRoutes } from './features/stories/routes/stories'
 
 const app = new Hono<{ Bindings: CloudflareBindings }>()
 
@@ -33,6 +34,7 @@ registerApiRoutes(app)
 registerAdminRoutes(app)
 registerStudentRoutes(app)
 registerAiRoutes(app)
+registerStoriesRoutes(app)
 registerPublicRoutes(app)
 
 export default app
