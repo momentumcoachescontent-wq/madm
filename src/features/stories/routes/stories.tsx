@@ -6,6 +6,20 @@ import { getCurrentUser } from '../../../auth-utils'
 import { HeroSection } from '../../../views/components/HeroSection'
 import { Button } from '../../../views/components/Button'
 
+function extractMeta(html: string, targetName: string): string | null {
+  const metaTags = html.match(/<meta\s+[^>]*>/gi) || []
+  for (const tag of metaTags) {
+    const nameMatch = tag.match(/name=(?:"([^"]*)"|'([^']*)')/i)
+    const name = nameMatch ? (nameMatch[1] || nameMatch[2]) : null
+
+    if (name === targetName) {
+      const contentMatch = tag.match(/content=(?:"([^"]*)"|'([^']*)')/i)
+      return contentMatch ? (contentMatch[1] || contentMatch[2]) : null
+    }
+  }
+  return null
+}
+
 export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
   const storiesRoutes = new Hono<{ Bindings: CloudflareBindings }>()
 
@@ -30,7 +44,14 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       // Check Size
-      const maxBytes = c.env.MAX_UPLOAD_BYTES ? parseInt(c.env.MAX_UPLOAD_BYTES) : 2 * 1024 * 1024
+      let maxBytes = 3 * 1024 * 1024 // Default 3MB
+      if (c.env.MAX_UPLOAD_BYTES) {
+        const parsed = parseInt(c.env.MAX_UPLOAD_BYTES)
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          maxBytes = parsed
+        }
+      }
+
       if (file.size > maxBytes) {
         return c.text('File too large', 413)
       }
@@ -39,20 +60,13 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
       const content = await file.text()
 
       // Validate Metadata
-      const hasTitle = /<meta\s+name="madm:title"\s+content="[^"]*"/i.test(content)
-      const hasAuthor = /<meta\s+name="madm:author"\s+content="[^"]*"/i.test(content)
-      const hasStorySection = /<section\s+data-madm="story"/i.test(content)
+      const meta_title = extractMeta(content, 'madm:title')
+      const meta_author = extractMeta(content, 'madm:author')
+      const hasStorySection = /<section\s+[^>]*data-madm=["']story["'][^>]*>/i.test(content)
 
-      if (!hasTitle || !hasAuthor || !hasStorySection) {
+      if (!meta_title || !meta_author || !hasStorySection) {
         return c.text('Invalid file format. Missing required metadata or sections.', 400)
       }
-
-      // Extract Metadata using Regex
-      const titleMatch = content.match(/<meta\s+name="madm:title"\s+content="([^"]*)"/i)
-      const authorMatch = content.match(/<meta\s+name="madm:author"\s+content="([^"]*)"/i)
-
-      const meta_title = titleMatch ? titleMatch[1] : null
-      const meta_author = authorMatch ? authorMatch[1] : null
 
       // Upload to R2
       const timestamp = Date.now()
