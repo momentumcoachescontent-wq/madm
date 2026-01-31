@@ -9,11 +9,11 @@ import { Button } from '../../../views/components/Button'
 function extractMeta(html: string, targetName: string): string | null {
   const metaTags = html.match(/<meta\s+[^>]*>/gi) || []
   for (const tag of metaTags) {
-    const nameMatch = tag.match(/name=(?:"([^"]*)"|'([^']*)')/i)
+    const nameMatch = tag.match(/name\s*=\s*(?:"([^"]*)"|'([^']*)')/i)
     const name = nameMatch ? (nameMatch[1] || nameMatch[2]) : null
 
     if (name === targetName) {
-      const contentMatch = tag.match(/content=(?:"([^"]*)"|'([^']*)')/i)
+      const contentMatch = tag.match(/content\s*=\s*(?:"([^"]*)"|'([^']*)')/i)
       return contentMatch ? (contentMatch[1] || contentMatch[2]) : null
     }
   }
@@ -45,8 +45,8 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
 
       // Check Size
       let maxBytes = 3 * 1024 * 1024 // Default 3MB
-      if (c.env.MAX_UPLOAD_BYTES) {
-        const parsed = parseInt(c.env.MAX_UPLOAD_BYTES)
+      if (c.env.MAX_UPLOAD_BYTES && /^\d+$/.test(c.env.MAX_UPLOAD_BYTES)) {
+        const parsed = parseInt(c.env.MAX_UPLOAD_BYTES, 10)
         if (!Number.isNaN(parsed) && parsed > 0) {
           maxBytes = parsed
         }
@@ -62,7 +62,7 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
       // Validate Metadata
       const meta_title = extractMeta(content, 'madm:title')
       const meta_author = extractMeta(content, 'madm:author')
-      const hasStorySection = /<section\s+[^>]*data-madm=["']story["'][^>]*>/i.test(content)
+      const hasStorySection = /<section\s+[^>]*data-madm\s*=\s*["']story["'][^>]*>/i.test(content)
 
       if (!meta_title || !meta_author || !hasStorySection) {
         return c.text('Invalid file format. Missing required metadata or sections.', 400)
