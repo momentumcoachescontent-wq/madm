@@ -6,6 +6,9 @@ export interface Story {
   status: 'pending' | 'approved' | 'rejected'
   r2_key: string
   original_filename: string
+  file_hash: string | null
+  submitter_alias: string | null
+  moderation_notes: string | null
   meta_title: string | null
   meta_author: string | null
   ip_address: string | null
@@ -17,6 +20,8 @@ export interface CreateStoryParams {
   user_id: number | null
   r2_key: string
   original_filename: string
+  file_hash?: string | null
+  submitter_alias?: string | null
   meta_title?: string | null
   meta_author?: string | null
   ip_address?: string | null
@@ -24,13 +29,15 @@ export interface CreateStoryParams {
 
 export const createStory = async (db: D1Database, params: CreateStoryParams) => {
   const query = `
-    INSERT INTO stories (user_id, r2_key, original_filename, meta_title, meta_author, ip_address)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO stories (user_id, r2_key, original_filename, file_hash, submitter_alias, meta_title, meta_author, ip_address)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `
   const args = [
     params.user_id,
     params.r2_key,
     params.original_filename,
+    params.file_hash ?? null,
+    params.submitter_alias ?? null,
     params.meta_title ?? null,
     params.meta_author ?? null,
     params.ip_address ?? null
@@ -74,6 +81,10 @@ export const listStories = async (db: D1Database, filters: ListStoriesFilters = 
 
 export const getStory = async (db: D1Database, id: number) => {
   return await dbFirst<Story>(db, `SELECT * FROM stories WHERE id = ?`, [id])
+}
+
+export const getStoryByHash = async (db: D1Database, hash: string) => {
+  return await dbFirst<Story>(db, `SELECT * FROM stories WHERE file_hash = ?`, [hash])
 }
 
 export const updateStoryStatus = async (db: D1Database, id: number, status: 'approved' | 'rejected') => {
