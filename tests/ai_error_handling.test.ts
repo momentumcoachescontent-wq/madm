@@ -52,6 +52,6 @@ describe('AI Route Error Handling', () => {
 
     expect(res.status).toBe(500)
     const text = await res.text()
-    expect(text).toBe('Error interno del servidor')
+    expect(text).toBe('Error interno del servidor: Some other DB error')
   })
 })
