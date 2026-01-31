@@ -70,13 +70,12 @@ export function registerAiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       }
 
       if (usageRecord) {
-        // Registro existe, verificar límite
-        const currentCount = usageRecord.count as number
-        if (currentCount < limit) {
-          // Aumentar contador
-          await c.env.DB.prepare(
-            `UPDATE daily_ai_usage SET count = count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-          ).bind(usageRecord.id).run()
+        // Registro existe, verificar límite de forma atómica
+        const updateResult = await c.env.DB.prepare(
+          `UPDATE daily_ai_usage SET count = count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND count < ?`
+        ).bind(usageRecord.id, limit).run()
+
+        if (updateResult.meta.changes > 0) {
           allowAccess = true
         } else {
           // Límite alcanzado

@@ -42,7 +42,9 @@ describe('AI Assistant Limits', () => {
     vi.mocked(AuthUtils.getCurrentUser).mockResolvedValue(null)
 
     // 2. DB Mocks
-    // Upsert returns success (changes: 1)
+    // Usage Check: returns null (Not found -> Insert path)
+    mockDB.first.mockResolvedValueOnce(null)
+    // Insert: returns success
     mockDB.run.mockResolvedValueOnce({ meta: { changes: 1 } })
 
     const res = await app.request('/asistente-ia', {
@@ -52,9 +54,9 @@ describe('AI Assistant Limits', () => {
     expect(res.status).toBe(302)
     expect(res.headers.get('Location')).toContain('opal.google')
 
-    // Verify Upsert Query
+    // Verify Manual Upsert Flow (SELECT -> INSERT)
+    expect(mockDB.prepare).toHaveBeenCalledWith(expect.stringContaining('SELECT id, count FROM daily_ai_usage'))
     expect(mockDB.prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO daily_ai_usage'))
-    expect(mockDB.prepare).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'))
     expect(mockDB.run).toHaveBeenCalled()
   })
 
@@ -63,7 +65,9 @@ describe('AI Assistant Limits', () => {
     vi.mocked(AuthUtils.getCurrentUser).mockResolvedValue(null)
 
     // 2. DB Mocks
-    // Upsert returns failure/noop (changes: 0)
+    // Usage Check: returns existing record with max usage (Update path)
+    mockDB.first.mockResolvedValueOnce({ id: 99, count: 1 })
+    // Update (Atomic Check): returns failure (changes: 0)
     mockDB.run.mockResolvedValueOnce({ meta: { changes: 0 } })
 
     const res = await app.request('/asistente-ia', {
@@ -75,7 +79,9 @@ describe('AI Assistant Limits', () => {
     expect(text).toContain('Límite Diario Alcanzado')
     expect(text).toContain('Regístrate Gratis') // Specific for Anon
 
-    // Verify Upsert WAS attempted
+    // Verify SELECT -> UPDATE flow
+    expect(mockDB.prepare).toHaveBeenCalledWith(expect.stringContaining('SELECT id, count FROM daily_ai_usage'))
+    expect(mockDB.prepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE daily_ai_usage'))
     expect(mockDB.run).toHaveBeenCalled()
   })
 
@@ -86,13 +92,17 @@ describe('AI Assistant Limits', () => {
     // 2. DB Mocks
     // Paid Check: returns null (Not paid)
     mockDB.first.mockResolvedValueOnce(null)
-    // Upsert returns success
+    // Usage Check: returns existing record (Update path)
+    mockDB.first.mockResolvedValueOnce({ id: 1, count: 1 })
+    // Update: returns success
     mockDB.run.mockResolvedValueOnce({ meta: { changes: 1 } })
 
     const res = await app.request('/asistente-ia', {}, { DB: mockDB })
 
     expect(res.status).toBe(302)
-    expect(mockDB.prepare).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'))
+    // Verify SELECT -> UPDATE flow
+    expect(mockDB.prepare).toHaveBeenCalledWith(expect.stringContaining('SELECT id, count FROM daily_ai_usage'))
+    expect(mockDB.prepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE daily_ai_usage'))
   })
 
   it('Free User: Limit 3 - Blocked', async () => {
@@ -102,7 +112,9 @@ describe('AI Assistant Limits', () => {
     // 2. DB Mocks
     // Paid Check: returns null (Not paid)
     mockDB.first.mockResolvedValueOnce(null)
-    // Upsert returns noop
+    // Usage Check: returns existing record at limit
+    mockDB.first.mockResolvedValueOnce({ id: 1, count: 3 })
+    // Update: returns failure
     mockDB.run.mockResolvedValueOnce({ meta: { changes: 0 } })
 
     const res = await app.request('/asistente-ia', {}, { DB: mockDB })
@@ -119,7 +131,9 @@ describe('AI Assistant Limits', () => {
     // 2. DB Mocks
     // Paid Check: returns row (Paid)
     mockDB.first.mockResolvedValueOnce({ '1': 1 })
-    // Upsert returns success
+    // Usage Check: returns existing record (Update path)
+    mockDB.first.mockResolvedValueOnce({ id: 2, count: 5 })
+    // Update: returns success
     mockDB.run.mockResolvedValueOnce({ meta: { changes: 1 } })
 
     const res = await app.request('/asistente-ia', {}, { DB: mockDB })
@@ -134,7 +148,9 @@ describe('AI Assistant Limits', () => {
     // 2. DB Mocks
     // Paid Check: returns row (Paid)
     mockDB.first.mockResolvedValueOnce({ '1': 1 })
-    // Upsert returns noop
+    // Usage Check: returns existing record at limit
+    mockDB.first.mockResolvedValueOnce({ id: 2, count: 10 })
+    // Update: returns failure
     mockDB.run.mockResolvedValueOnce({ meta: { changes: 0 } })
 
     const res = await app.request('/asistente-ia', {}, { DB: mockDB })
