@@ -30,39 +30,39 @@ const LessonForm = (lesson: any = {}, courses: any[] = []) => {
 
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">Módulo #</label>
-          <input type="number" name="module_number" value="${lesson.module_number || 1}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+          <input type="number" name="module_number" value="${lesson.module_number ?? 1}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
         </div>
 
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">Lección #</label>
-          <input type="number" name="lesson_number" value="${lesson.lesson_number || 1}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+          <input type="number" name="lesson_number" value="${lesson.lesson_number ?? 1}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
         </div>
       </div>
 
       <div class="form-group" style="margin-top: 15px;">
         <label style="display: block; margin-bottom: 5px; font-weight: 600;">Título</label>
-        <input type="text" name="title" value="${lesson.title || ''}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+        <input type="text" name="title" value="${lesson.title ?? ''}" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
       </div>
 
       <div class="form-group" style="margin-top: 15px;">
         <label style="display: block; margin-bottom: 5px; font-weight: 600;">Descripción Corta</label>
-        <textarea name="description" rows="2" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">${lesson.description || ''}</textarea>
+        <textarea name="description" rows="2" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">${lesson.description ?? ''}</textarea>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">URL del Video</label>
-          <input type="text" name="video_url" value="${lesson.video_url || ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+          <input type="text" name="video_url" value="${lesson.video_url ?? ''}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
         </div>
         <div class="form-group">
           <label style="display: block; margin-bottom: 5px; font-weight: 600;">Duración (segundos)</label>
-          <input type="number" name="video_duration" value="${lesson.video_duration || 0}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
+          <input type="number" name="video_duration" value="${lesson.video_duration ?? 0}" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">
         </div>
       </div>
 
       <div class="form-group" style="margin-top: 15px;">
         <label style="display: block; margin-bottom: 5px; font-weight: 600;">Contenido (HTML)</label>
-        <textarea name="content" rows="6" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">${lesson.content || ''}</textarea>
+        <textarea name="content" rows="6" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px;">${lesson.content ?? ''}</textarea>
       </div>
 
       <div style="display: flex; gap: 20px; margin-top: 20px;">

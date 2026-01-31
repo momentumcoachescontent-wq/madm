@@ -18,7 +18,7 @@ export function registerAiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       // 1. Identificar Usuario
       const user = await getCurrentUser(c)
       let userId: number | null = null
-      let ipAddress = c.req.header('CF-Connecting-IP') || 'unknown'
+      let ipAddress = c.req.header('CF-Connecting-IP') ?? 'unknown'
 
       // Si estamos en desarrollo local, IP puede ser localhost
       if (ipAddress === 'unknown' && c.req.header('host')?.includes('localhost')) {
