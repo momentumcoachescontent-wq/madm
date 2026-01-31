@@ -10,6 +10,11 @@ export function registerAiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
 
   aiRoutes.get('/asistente-ia', async (c) => {
     try {
+      // 0. Verificar conexión a DB
+      if (!c.env.DB) {
+        throw new Error('Database binding (DB) is missing. Check wrangler.toml or Cloudflare Pages settings.')
+      }
+
       // 1. Identificar Usuario
       const user = await getCurrentUser(c)
       let userId: number | null = null
@@ -89,7 +94,7 @@ export function registerAiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
         return c.text('Error de configuración: La tabla requerida no existe. Por favor, ejecuta las migraciones de base de datos (Error: no such table).', 500)
       }
 
-      return c.text('Error interno del servidor', 500)
+      return c.text(`Error interno del servidor: ${error instanceof Error ? error.message : String(error)}`, 500)
     }
   })
 
