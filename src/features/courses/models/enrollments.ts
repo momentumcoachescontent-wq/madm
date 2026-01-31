@@ -90,12 +90,12 @@ export const createEnrollment = async (db: D1Database, enrollment: NewEnrollment
     [
       enrollment.user_id,
       enrollment.course_id,
-      enrollment.payment_id || null,
-      enrollment.payment_status || 'pending',
+      enrollment.payment_id ?? null,
+      enrollment.payment_status ?? 'pending',
       enrollment.amount_paid,
-      enrollment.currency || 'USD',
-      enrollment.payment_method || null,
-      enrollment.expires_at || null,
+      enrollment.currency ?? 'USD',
+      enrollment.payment_method ?? null,
+      enrollment.expires_at ?? null,
       enrollment.access_revoked || 0
     ]
   )

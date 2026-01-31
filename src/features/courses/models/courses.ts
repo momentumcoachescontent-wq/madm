@@ -43,28 +43,28 @@ export type NewCourse = {
  * Get a course by ID
  */
 export const getCourseById = async (db: D1Database, id: number): Promise<Course | null> => {
-  return await dbFirst<Course>(db, 'SELECT * FROM courses WHERE id = ?', [id])
+  return dbFirst<Course>(db, 'SELECT * FROM courses WHERE id = ?', [id])
 }
 
 /**
  * Get a course by Slug
  */
 export const getCourseBySlug = async (db: D1Database, slug: string): Promise<Course | null> => {
-  return await dbFirst<Course>(db, 'SELECT * FROM courses WHERE slug = ?', [slug])
+  return dbFirst<Course>(db, 'SELECT * FROM courses WHERE slug = ?', [slug])
 }
 
 /**
  * List all courses (Admin)
  */
 export const listCourses = async (db: D1Database): Promise<Course[]> => {
-  return await dbAll<Course>(db, 'SELECT * FROM courses ORDER BY created_at DESC')
+  return dbAll<Course>(db, 'SELECT * FROM courses ORDER BY created_at DESC')
 }
 
 /**
  * List published courses (Public)
  */
 export const listPublishedCourses = async (db: D1Database): Promise<Course[]> => {
-  return await dbAll<Course>(db, 'SELECT * FROM courses WHERE published = 1 ORDER BY created_at DESC')
+  return dbAll<Course>(db, 'SELECT * FROM courses WHERE published = 1 ORDER BY created_at DESC')
 }
 
 /**
@@ -79,7 +79,7 @@ export const countCourses = async (db: D1Database): Promise<number> => {
  * Create a new course
  */
 export const createCourse = async (db: D1Database, course: NewCourse) => {
-  return await dbRun(
+  return dbRun(
     db,
     `INSERT INTO courses (title, slug, subtitle, description, price, currency, duration_weeks, level, featured_image, published, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
@@ -121,5 +121,5 @@ export const updateCourse = async (db: D1Database, id: number, course: Partial<N
   const query = `UPDATE courses SET ${updates.join(', ')} WHERE id = ?`
   args.push(id)
 
-  return await dbRun(db, query, args)
+  return dbRun(db, query, args)
 }
