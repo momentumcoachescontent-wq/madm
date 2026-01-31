@@ -11,4 +11,6 @@ export type CloudflareBindings = {
   RESEND_API_KEY: string
   FROM_EMAIL: string
   BASE_URL: string
+  STORE_CLIENT_IP?: string
+  MAX_UPLOAD_BYTES?: string
 }

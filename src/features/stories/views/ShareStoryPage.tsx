@@ -53,7 +53,7 @@ export const ShareStoryPage = () => {
                 </ol>
               </div>
 
-              <a href="/asistente-ia" target="_blank" className="btn btn-primary btn-lg" id="btn-open-ai">
+              <a href="/asistente-ia" target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-lg" id="btn-open-ai">
                 <i className="fas fa-external-link-alt"></i> Abrir Asistente IA
               </a>
 
@@ -243,6 +243,8 @@ export const ShareStoryPage = () => {
           const btnSubmit = document.getElementById('btn-submit');
           const checkboxes = document.querySelectorAll('input[type="checkbox"]');
 
+          let isFileValid = false;
+
           dropArea.addEventListener('click', () => fileInput.click());
 
           dropArea.addEventListener('dragover', (e) => {
@@ -280,6 +282,7 @@ export const ShareStoryPage = () => {
             consentSection.style.opacity = '0.5';
             consentSection.style.pointerEvents = 'none';
             btnSubmit.disabled = true;
+            isFileValid = false;
             checkboxes.forEach(cb => cb.checked = false);
           });
 
@@ -333,6 +336,7 @@ export const ShareStoryPage = () => {
             }
 
             if (errors.length > 0) {
+              isFileValid = false;
               validationStatus.textContent = 'Archivo inválido';
               validationStatus.style.color = '#ef4444';
               validationErrors.innerHTML = errors.map(e => '<div>• ' + e + '</div>').join('');
@@ -341,6 +345,7 @@ export const ShareStoryPage = () => {
               consentSection.style.pointerEvents = 'none';
               btnSubmit.disabled = true;
             } else {
+              isFileValid = true;
               validationStatus.textContent = '✓ Archivo válido';
               validationStatus.style.color = '#10b981';
               consentSection.style.opacity = '1';
@@ -356,8 +361,7 @@ export const ShareStoryPage = () => {
 
           function checkSubmit() {
             const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-            const isValidFile = validationStatus.textContent.includes('válido');
-            btnSubmit.disabled = !(allChecked && isValidFile);
+            btnSubmit.disabled = !(allChecked && isFileValid);
           }
         });
       `}} />
