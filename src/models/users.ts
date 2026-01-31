@@ -50,7 +50,7 @@ export const getUserByEmail = async (db: D1Database, email: string): Promise<Use
  * Create a new user
  */
 export const createUser = async (db: D1Database, user: NewUser) => {
-  const role = user.role ?? 'student'
+  const role = user.role || 'student'
   const active = user.active !== undefined ? user.active : 1
   const email_verified = user.email_verified !== undefined ? user.email_verified : 0
 
@@ -79,7 +79,7 @@ export const updateUser = async (db: D1Database, id: number, user: UpdateUser) =
   }
   if (user.role !== undefined) {
     fields.push('role = ?')
-    values.push(user.role)
+    values.push(user.role || 'student')
   }
   if (user.active !== undefined) {
     fields.push('active = ?')
