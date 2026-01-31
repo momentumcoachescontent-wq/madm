@@ -42,6 +42,7 @@ export const renderer = jsxRenderer(({ children }) => {
                 <a href="/recursos-gratuitos">Recursos Gratuitos</a>
                 <a href="/cursos">Cursos</a>
                 <a href="/comunidad">Comunidad</a>
+                <a href="/comparte-tu-historia">Historias</a>
                 <a href="/blog">Blog</a>
                 <a href="/sobre-nosotros">Sobre Nosotros</a>
                 <a href="/contacto">Contacto</a>
