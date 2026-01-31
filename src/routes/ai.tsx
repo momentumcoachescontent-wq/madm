@@ -81,8 +81,14 @@ export function registerAiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
         )
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error en ruta de IA:', error)
+
+      // Improve error message for known DB issues (likely missing migrations in production)
+      if (error.message && error.message.includes('no such table')) {
+        return c.text('Error de configuración: La tabla requerida no existe. Por favor, ejecuta las migraciones de base de datos (Error: no such table).', 500)
+      }
+
       return c.text('Error interno del servidor', 500)
     }
   })
