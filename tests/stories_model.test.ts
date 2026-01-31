@@ -53,12 +53,12 @@ describe('Stories Model', () => {
   it('updateStoryStatus: returns changes count', async () => {
     // Mock update success (1 change)
     mockDB.run.mockResolvedValueOnce({ meta: { changes: 1 } })
-    const result1 = await updateStoryStatus(mockDB, 1, 'approved')
+    const result1 = await updateStoryStatus(mockDB, 1, 'approved', 1, 'Looks good')
     expect(result1).toBe(1)
 
     // Mock update failure (0 changes - id not found)
     mockDB.run.mockResolvedValueOnce({ meta: { changes: 0 } })
-    const result2 = await updateStoryStatus(mockDB, 999, 'rejected')
+    const result2 = await updateStoryStatus(mockDB, 999, 'rejected', 1, 'Bad')
     expect(result2).toBe(0)
   })
 })

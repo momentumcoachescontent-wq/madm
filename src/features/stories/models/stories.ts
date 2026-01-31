@@ -11,6 +11,11 @@ export interface Story {
   ip_address: string | null
   created_at: string
   updated_at: string
+  moderated_by: number | null
+  moderated_at: string | null
+  moderation_notes: string | null
+  file_hash: string | null
+  submitter_alias: string | null
 }
 
 export interface CreateStoryParams {
@@ -76,8 +81,18 @@ export const getStory = async (db: D1Database, id: number) => {
   return await dbFirst<Story>(db, `SELECT * FROM stories WHERE id = ?`, [id])
 }
 
-export const updateStoryStatus = async (db: D1Database, id: number, status: 'approved' | 'rejected') => {
-  const result = await dbRun(db, `UPDATE stories SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [status, id])
+export const updateStoryStatus = async (
+  db: D1Database,
+  id: number,
+  status: 'approved' | 'rejected',
+  moderatedBy: number,
+  notes?: string
+) => {
+  const result = await dbRun(
+    db,
+    `UPDATE stories SET status = ?, moderated_by = ?, moderated_at = CURRENT_TIMESTAMP, moderation_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [status, moderatedBy, notes || null, id]
+  )
   return result.changes
 }
 

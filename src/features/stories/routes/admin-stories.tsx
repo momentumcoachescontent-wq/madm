@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import { html } from 'hono/html'
 import { CloudflareBindings } from '../../../types'
 import { AdminLayout } from '../../../admin/layout'
-import { listStories, updateStoryStatus, countStories } from '../models/stories'
+import { listStories, getStory, countStories } from '../models/stories'
+import { sanitizeHtml } from '../../../lib/sanitize'
 
 const app = new Hono<{ Bindings: CloudflareBindings }>()
 
@@ -67,7 +68,7 @@ app.get('/', async (c) => {
             <thead>
               <tr style="background: #f8fafc; text-align: left; color: #64748b; font-size: 0.9em;">
                 <th style="padding: 15px 20px;">Fecha</th>
-                <th style="padding: 15px 20px;">Título / Autor</th>
+                <th style="padding: 15px 20px;">Título / Autor / Alias</th>
                 <th style="padding: 15px 20px;">Archivo</th>
                 <th style="padding: 15px 20px;">Estado</th>
                 <th style="padding: 15px 20px;">Acciones</th>
@@ -89,6 +90,7 @@ app.get('/', async (c) => {
                   <td style="padding: 15px 20px;">
                     <div style="font-weight: 500; color: #1e293b;">${story.meta_title || 'Sin título'}</div>
                     <div style="font-size: 0.9em; color: #64748b;">${story.meta_author || 'Anónimo'}</div>
+                    ${story.submitter_alias ? html`<div style="font-size: 0.8em; color: #3b82f6;">Alias: ${story.submitter_alias}</div>` : ''}
                   </td>
                   <td style="padding: 15px 20px;">
                      <a href="/media/${story.r2_key}" target="_blank" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: #8b5cf6; font-weight: 500;">
@@ -99,20 +101,9 @@ app.get('/', async (c) => {
                     ${StatusBadge(story.status)}
                   </td>
                   <td style="padding: 15px 20px;">
-                    ${story.status === 'pending' ? html`
-                       <div style="display: flex; gap: 5px;">
-                         <form action="/admin/stories/${story.id}/status" method="POST" style="display:inline;">
-                           <input type="hidden" name="status" value="approved">
-                           <button class="btn btn-sm" style="background: #dcfce7; color: #15803d; border: none;" title="Aprobar"><i class="fas fa-check"></i></button>
-                         </form>
-                         <form action="/admin/stories/${story.id}/status" method="POST" style="display:inline;">
-                           <input type="hidden" name="status" value="rejected">
-                           <button class="btn btn-sm" style="background: #fee2e2; color: #b91c1c; border: none;" title="Rechazar"><i class="fas fa-times"></i></button>
-                         </form>
-                       </div>
-                    ` : html`
-                       <span style="color: #cbd5e1;">-</span>
-                    `}
+                    <a href="/admin/stories/${story.id}" class="btn btn-sm btn-primary" style="background: #3b82f6; border: none;">
+                      ${story.status === 'pending' ? 'Revisar' : 'Ver'}
+                    </a>
                   </td>
                 </tr>
               `)}
@@ -137,28 +128,125 @@ app.get('/', async (c) => {
   }))
 })
 
-// UPDATE Status
-app.post('/:id/status', async (c) => {
+// DETAIL VIEW
+app.get('/:id', async (c) => {
   const idStr = c.req.param('id')
-  if (!/^\d+$/.test(idStr)) {
-    return c.text('Invalid id', 400)
-  }
+  if (!/^\d+$/.test(idStr)) return c.redirect('/admin/stories')
   const id = Number(idStr)
-  const body = await c.req.parseBody()
-  const status = body['status'] as 'approved' | 'rejected'
 
-  if (status !== 'approved' && status !== 'rejected') {
-    return c.text('Invalid status', 400)
+  const story = await getStory(c.env.DB, id)
+  if (!story) return c.redirect('/admin/stories')
+
+  // Fetch Content
+  let content = 'Error al cargar el contenido'
+  try {
+     const obj = await c.env.IMAGES_BUCKET.get(story.r2_key)
+     if (obj) {
+       content = await obj.text()
+     }
+  } catch (e) {
+    console.error('Error fetching R2:', e)
   }
 
-  const changes = await updateStoryStatus(c.env.DB, id, status)
+  // Sanitize
+  const safeHtmlContent = sanitizeHtml(content)
 
-  if (!changes) {
-    return c.text('Story not found', 404)
-  }
+  return c.html(AdminLayout({
+    title: `Historia #${story.id}`,
+    activeItem: 'stories',
+    headerActions: html`<a href="/admin/stories" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver</a>`,
+    children: html`
+      <div style="display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start;">
 
-  // Redirect back to list
-  return c.redirect('/admin/stories?status=pending')
+        <!-- Sidebar: Metadata & Actions -->
+        <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+           <h3 style="margin-top: 0; color: #1e293b;">Detalles</h3>
+           <dl>
+             <dt style="font-size: 0.8em; color: #64748b; font-weight: 600;">Estado</dt>
+             <dd style="margin-left: 0; margin-bottom: 15px;">${StatusBadge(story.status)}</dd>
+
+             <dt style="font-size: 0.8em; color: #64748b; font-weight: 600;">Autor (Meta)</dt>
+             <dd style="margin-left: 0; margin-bottom: 15px;">${story.meta_author || '-'}</dd>
+
+             <dt style="font-size: 0.8em; color: #64748b; font-weight: 600;">Alias</dt>
+             <dd style="margin-left: 0; margin-bottom: 15px;">${story.submitter_alias || '-'}</dd>
+
+             <dt style="font-size: 0.8em; color: #64748b; font-weight: 600;">Subido</dt>
+             <dd style="margin-left: 0; margin-bottom: 15px;">${new Date(story.created_at).toLocaleString()}</dd>
+
+             <dt style="font-size: 0.8em; color: #64748b; font-weight: 600;">IP</dt>
+             <dd style="margin-left: 0; margin-bottom: 15px;">${story.ip_address || 'N/A'}</dd>
+           </dl>
+
+           ${story.moderation_notes ? html`
+             <div style="background: #fffbeb; padding: 10px; border-radius: 6px; margin-bottom: 20px;">
+               <strong style="color: #b45309; display: block; margin-bottom: 5px;">Nota de Moderación:</strong>
+               <p style="margin: 0; font-size: 0.9em; color: #78350f;">${story.moderation_notes}</p>
+             </div>
+           ` : ''}
+
+           ${story.status === 'pending' ? html`
+             <div style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
+               <h4 style="margin-top: 0; margin-bottom: 15px;">Acciones</h4>
+               <button id="btn-approve" class="btn btn-primary" style="width: 100%; margin-bottom: 10px; background: #10b981; border-color: #10b981;">Aprobar</button>
+               <button id="btn-reject" class="btn btn-secondary" style="width: 100%; background: #ef4444; color: white; border-color: #ef4444;">Rechazar</button>
+             </div>
+           ` : ''}
+        </div>
+
+        <!-- Main: Preview -->
+        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+           <h2 style="margin-top: 0; margin-bottom: 20px;">Vista Previa: ${story.meta_title}</h2>
+           <div style="border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; background: #fafafa; min-height: 400px;">
+             ${html`${safeHtmlContent}`}
+           </div>
+        </div>
+
+      </div>
+
+      <!-- Scripts -->
+      <script>
+        const storyId = ${story.id};
+
+        document.getElementById('btn-approve')?.addEventListener('click', async () => {
+          if (!confirm('¿Aprobar esta historia?')) return;
+
+          try {
+            const res = await fetch('/api/admin/stories/' + storyId + '/approve', { method: 'POST' });
+            if (res.ok) {
+              window.location.reload();
+            } else {
+              const data = await res.json().catch(() => ({}));
+              alert('Error al aprobar: ' + (data.error || 'Error desconocido'));
+            }
+          } catch(e) { alert('Error: ' + e.message); }
+        });
+
+        document.getElementById('btn-reject')?.addEventListener('click', async () => {
+          const notes = prompt('Ingrese el motivo del rechazo (obligatorio):');
+          if (notes === null) return; // Cancelled
+          if (!notes.trim()) {
+            alert('El motivo es obligatorio.');
+            return;
+          }
+
+          try {
+            const res = await fetch('/api/admin/stories/' + storyId + '/reject', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ notes })
+            });
+            if (res.ok) {
+              window.location.reload();
+            } else {
+              const data = await res.json();
+              alert('Error: ' + (data.error || 'Error al rechazar'));
+            }
+          } catch(e) { alert('Error: ' + e.message); }
+        });
+      </script>
+    `
+  }))
 })
 
 export default app
