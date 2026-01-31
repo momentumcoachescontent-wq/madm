@@ -32,10 +32,10 @@ app.post('/:id/approve', async (c) => {
 
   // Trigger processing
   if (c.executionCtx) {
-    c.executionCtx.waitUntil(processStoryApproval(c.env.DB, id))
+    c.executionCtx.waitUntil(processStoryApproval(c.env.DB, c.env.IMAGES_BUCKET, id))
   } else {
     // Fallback for environments without executionCtx
-    await processStoryApproval(c.env.DB, id)
+    await processStoryApproval(c.env.DB, c.env.IMAGES_BUCKET, id)
   }
 
   return c.json({ success: true, status: 'approved' })

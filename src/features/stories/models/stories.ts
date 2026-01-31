@@ -16,6 +16,12 @@ export interface Story {
   moderation_notes: string | null
   file_hash: string | null
   submitter_alias: string | null
+  slug: string | null
+  story_text: string | null
+  analysis_text: string | null
+  excerpt: string | null
+  thumbnail_url: string | null
+  published_at: string | null
 }
 
 export interface CreateStoryParams {
