@@ -13,10 +13,28 @@ export function sanitizeHtml(html: string): string {
   const options = {
     whiteList: {
       ...xss.whiteList,
-      // Add or customize allowed tags if needed.
-      // xss defaults are usually safe for blog posts (p, b, i, a, img, etc).
-      // We explicitly allow common formatting tags.
-      h1: [], h2: [], h3: [], h4: [], h5: [], h6: [],
+      // Structure tags (for full document sanitization)
+      html: ['lang'],
+      head: [],
+      body: ['class', 'style'],
+      title: [],
+      meta: ['name', 'content', 'property', 'charset'],
+      link: ['rel', 'href', 'type', 'media'], // Allow stylesheets if needed, or remove if strict
+
+      // Semantic tags
+      section: ['class', 'style', 'data-madm'],
+      article: ['class', 'style'],
+      header: ['class', 'style'],
+      footer: ['class', 'style'],
+      nav: ['class', 'style'],
+      main: ['class', 'style'],
+      aside: ['class', 'style'],
+      figure: ['class', 'style'],
+      figcaption: ['class', 'style'],
+
+      // Common formatting
+      h1: ['class', 'style'], h2: ['class', 'style'], h3: ['class', 'style'],
+      h4: ['class', 'style'], h5: ['class', 'style'], h6: ['class', 'style'],
       p: ['class', 'style'],
       div: ['class', 'style'],
       span: ['class', 'style'],
