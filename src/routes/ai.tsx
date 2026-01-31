@@ -51,34 +51,68 @@ export function registerAiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
         }
       }
 
-      // 3. Upsert y Verificación de Límite (Atomic)
+      // 3. Verificación de Límite y Registro de Uso
+      // Nota: Usamos una estrategia manual (SELECT -> UPDATE/INSERT) en lugar de ON CONFLICT
+      // para evitar errores si los índices parciales faltan en producción.
       const today = new Date().toISOString().split('T')[0]
-      let result
+      let allowAccess = false
 
+      // Buscar registro existente
+      let usageRecord
       if (userId) {
-        // Logged-in user: Conflict on (user_id, usage_date)
-        result = await c.env.DB.prepare(
-          `INSERT INTO daily_ai_usage (user_id, ip_address, usage_date, count)
-           VALUES (?, ?, ?, 1)
-           ON CONFLICT (user_id, usage_date) WHERE user_id IS NOT NULL
-           DO UPDATE SET count = daily_ai_usage.count + 1, updated_at = CURRENT_TIMESTAMP
-           WHERE daily_ai_usage.count < ?`
-        ).bind(userId, ipAddress, today, limit).run()
+        usageRecord = await c.env.DB.prepare(
+          `SELECT id, count FROM daily_ai_usage WHERE user_id = ? AND usage_date = ?`
+        ).bind(userId, today).first()
       } else {
-        // Anonymous user: Conflict on (ip_address, usage_date)
-        result = await c.env.DB.prepare(
-          `INSERT INTO daily_ai_usage (user_id, ip_address, usage_date, count)
-           VALUES (NULL, ?, ?, 1)
-           ON CONFLICT (ip_address, usage_date) WHERE user_id IS NULL
-           DO UPDATE SET count = daily_ai_usage.count + 1, updated_at = CURRENT_TIMESTAMP
-           WHERE daily_ai_usage.count < ?`
-        ).bind(ipAddress, today, limit).run()
+        usageRecord = await c.env.DB.prepare(
+          `SELECT id, count FROM daily_ai_usage WHERE user_id IS NULL AND ip_address = ? AND usage_date = ?`
+        ).bind(ipAddress, today).first()
       }
 
-      // 4. Verificar resultado
-      // Si insertó o actualizó, changes > 0.
-      // Si no hizo nada (límite alcanzado en el WHERE del UPDATE), changes == 0.
-      if (result.meta.changes && result.meta.changes > 0) {
+      if (usageRecord) {
+        // Registro existe, verificar límite
+        const currentCount = usageRecord.count as number
+        if (currentCount < limit) {
+          // Aumentar contador
+          await c.env.DB.prepare(
+            `UPDATE daily_ai_usage SET count = count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+          ).bind(usageRecord.id).run()
+          allowAccess = true
+        } else {
+          // Límite alcanzado
+          allowAccess = false
+        }
+      } else {
+        // Registro no existe, insertar (inicio de conteo)
+        try {
+          await c.env.DB.prepare(
+            `INSERT INTO daily_ai_usage (user_id, ip_address, usage_date, count) VALUES (?, ?, ?, 1)`
+          ).bind(userId || null, ipAddress, today).run()
+          allowAccess = true
+        } catch (err: any) {
+          // Si falla por UNIQUE constraint (race condition), intentamos actualizar
+          // Esto maneja el caso donde otro request creó el registro milisegundos antes
+          if (err.message && (err.message.includes('UNIQUE') || err.message.includes('constraint'))) {
+             // Reintentar lógica de actualización (simplificada: asumimos que si falla insert es porque existe)
+             // Intentamos update ciego
+             const updateQuery = userId
+               ? `UPDATE daily_ai_usage SET count = count + 1, updated_at = CURRENT_TIMESTAMP WHERE usage_date = ? AND count < ? AND user_id = ?`
+               : `UPDATE daily_ai_usage SET count = count + 1, updated_at = CURRENT_TIMESTAMP WHERE usage_date = ? AND count < ? AND user_id IS NULL AND ip_address = ?`
+
+             const updateArgs = userId ? [today, limit, userId] : [today, limit, ipAddress]
+
+             const updateResult = await c.env.DB.prepare(updateQuery).bind(...updateArgs).run()
+
+             if (updateResult.meta.changes && updateResult.meta.changes > 0) {
+               allowAccess = true
+             }
+          } else {
+            throw err
+          }
+        }
+      }
+
+      if (allowAccess) {
         return c.redirect('https://opal.google/app/1ksajqIwfHXZb3FLtvzuC8ddkx4uZgE9_?shared')
       } else {
         return c.render(
