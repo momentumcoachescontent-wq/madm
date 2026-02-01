@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
 import { html } from 'hono/html'
 import { AdminLayout } from '../../../admin/layout'
+import { cleanupContentImages } from '../../../lib/media-cleanup'
 
 type Bindings = {
   DB: D1Database
+  IMAGES_BUCKET: R2Bucket
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -122,6 +124,11 @@ const CourseListHelper = (courses: any[]) => html`
                 <a href="/admin/courses/${course.id}" class="btn btn-sm btn-secondary">
                   <i class="fas fa-edit"></i>
                 </a>
+                <form method="POST" action="/admin/courses/${course.id}/delete" style="display:inline;" onsubmit="return confirm('¿Eliminar este curso y TODAS sus lecciones asociadas?')">
+                    <button type="submit" class="btn btn-sm btn-outline" style="color: #ef4444; border-color: #ef4444; margin-left: 5px;" title="Eliminar Curso">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
               </td>
             </tr>
           `)}
@@ -219,6 +226,36 @@ app.post('/:id', async (c) => {
     return c.redirect('/admin/courses')
   } catch (error) {
     return c.text('Error updating course: ' + (error as Error).message, 500)
+  }
+})
+
+// DELETE
+app.post('/:id/delete', async (c) => {
+  const { deleteCourse, getCourseById } = await import('../models/courses')
+  const { getFullLessonsByCourseId, deleteLesson } = await import('../models/lessons')
+  const id = parseInt(c.req.param('id'), 10)
+  if (isNaN(id)) return c.text('Invalid ID', 400)
+
+  try {
+    const course = await getCourseById(c.env.DB, id)
+    if (course) {
+        // 1. Delete all lessons and their images
+        const lessons = await getFullLessonsByCourseId(c.env.DB, id)
+        for (const lesson of lessons) {
+            await cleanupContentImages(c.env.IMAGES_BUCKET, [lesson.content])
+            await deleteLesson(c.env.DB, lesson.id)
+        }
+
+        // 2. Delete course images
+        await cleanupContentImages(c.env.IMAGES_BUCKET, [course.description], [course.featured_image])
+
+        // 3. Delete course
+        await deleteCourse(c.env.DB, id)
+    }
+
+    return c.redirect('/admin/courses')
+  } catch (error) {
+    return c.text('Error deleting course: ' + (error as Error).message, 500)
   }
 })
 

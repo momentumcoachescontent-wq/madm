@@ -2,9 +2,11 @@ import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { VersioningService, Version } from '../../../lib/versioning'
 import { AdminLayout } from '../../../admin/layout'
+import { cleanupContentImages } from '../../../lib/media-cleanup'
 
 type Bindings = {
   DB: D1Database
+  IMAGES_BUCKET: R2Bucket
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -134,6 +136,11 @@ const ListPageHelper = (posts: any[]) => { return html`
                 <a href="/blog/${post.slug}" target="_blank" class="btn btn-sm btn-outline">
                   <i class="fas fa-external-link-alt"></i>
                 </a>
+                <form method="POST" action="/admin/blog-posts/${post.id}/delete" style="display:inline;" onsubmit="return confirm('¿Eliminar este post y sus imágenes permanentemente?')">
+                    <button type="submit" class="btn btn-sm btn-outline" style="color: #ef4444; border-color: #ef4444; margin-left: 5px;" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
               </td>
             </tr>
           `})}
@@ -468,6 +475,29 @@ app.post('/:id', async (c) => {
     return c.redirect('/admin/blog-posts/' + id + '/edit')
   } catch (error) {
     return c.text('Error updating post: ' + (error as Error).message, 500)
+  }
+})
+
+// DELETE ACTION
+app.post('/:id/delete', async (c) => {
+  const { deleteBlogPost, getBlogPostById } = await import('../../../models/blog')
+  const id = c.req.param('id')
+
+  try {
+      const post = await getBlogPostById(c.env.DB, parseInt(id))
+      if (post) {
+          // Cleanup images
+          await cleanupContentImages(
+              c.env.IMAGES_BUCKET,
+              [post.content],
+              [post.image_url]
+          )
+
+          await deleteBlogPost(c.env.DB, parseInt(id))
+      }
+      return c.redirect('/admin/blog-posts')
+  } catch (error) {
+      return c.text('Error deleting post: ' + (error as Error).message, 500)
   }
 })
 
