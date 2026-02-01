@@ -62,19 +62,17 @@ export const ShareStoryPage = ({ stories = [] }: ShareStoryPageProps) => {
               Comparte tu experiencia con la comunidad. Tu historia puede ayudar a otros.
             </p>
 
-            <form action="/comparte-tu-historia" method="POST">
+            <form action="/comparte-tu-historia" method="POST" id="storyForm">
               <div className="mb-6">
-                <label htmlFor="story_text" className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="editor-container" className="block text-sm font-medium text-slate-700 mb-2">
                   Tu Historia
                 </label>
-                <textarea
-                  id="story_text"
-                  name="story_text"
-                  rows={15}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none transition-all"
-                  placeholder="Escribe aquí tu historia..."
-                  required
-                ></textarea>
+
+                {/* Quill Editor Container */}
+                <div id="editor-container" style={{ height: '400px', backgroundColor: 'white' }}></div>
+
+                {/* Hidden input to store the HTML content */}
+                <input type="hidden" name="story_text" id="story_text" />
               </div>
 
               <div className="flex justify-center">
@@ -86,6 +84,45 @@ export const ShareStoryPage = ({ stories = [] }: ShareStoryPageProps) => {
           </div>
         </div>
       </section>
+
+      {/* Quill Dependencies */}
+      <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
+      <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+      {/* Initialization Script */}
+      <script dangerouslySetInnerHTML={{ __html: `
+        document.addEventListener('DOMContentLoaded', function() {
+          var quill = new Quill('#editor-container', {
+            theme: 'snow',
+            placeholder: 'Escribe aquí tu historia... Puedes pegar imágenes directamente.',
+            modules: {
+              toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                ['blockquote', 'code-block'],
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                [{ 'color': [] }, { 'background': [] }],
+                ['link', 'image'],
+                ['clean']
+              ]
+            }
+          });
+
+          var form = document.getElementById('storyForm');
+          form.onsubmit = function() {
+            // Populate hidden input with HTML content
+            var storyText = document.querySelector('input[name=story_text]');
+            // Use root.innerHTML to get the full HTML content
+            storyText.value = quill.root.innerHTML;
+
+            // Basic validation
+            if (quill.getText().trim().length === 0) {
+              alert('Por favor escribe algo en tu historia.');
+              return false;
+            }
+          };
+        });
+      ` }} />
     </div>
   )
 }
