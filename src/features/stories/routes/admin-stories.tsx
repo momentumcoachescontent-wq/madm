@@ -307,32 +307,19 @@ app.get('/:id', async (c) => {
           btn.disabled = true;
 
           try {
-             // 1. Upload to R2
-             const uploadRes = await fetch('/admin/upload', {
+             // 1. Upload directly to Story endpoint (handles overwrite & cleanup)
+             const res = await fetch('/api/admin/stories/' + storyId + '/thumbnail-upload', {
                method: 'POST',
                body: formData
              });
-             const uploadData = await uploadRes.json();
+             const data = await res.json();
 
-             if (!uploadRes.ok || !uploadData.success) {
-               throw new Error(uploadData.error || 'Error al subir imagen');
+             if (!res.ok || !data.success) {
+               throw new Error(data.error || 'Error al subir imagen');
              }
 
-             const thumbnailUrl = uploadData.url;
-
-             // 2. Update Story
-             const updateRes = await fetch('/api/admin/stories/' + storyId + '/thumbnail', {
-               method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ thumbnailUrl })
-             });
-
-             if (updateRes.ok) {
-               window.location.reload();
-             } else {
-               const updateData = await updateRes.json();
-               throw new Error(updateData.error || 'Error al actualizar historia');
-             }
+             // Reload to see changes
+             window.location.reload();
 
           } catch (e) {
              alert('Error: ' + e.message);
