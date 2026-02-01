@@ -192,13 +192,35 @@ app.get('/:id', async (c) => {
              </div>
            ` : ''}
 
+           <!-- Thumbnail Management -->
+           <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 20px; margin-bottom: 20px;">
+             <h4 style="margin-top: 0; margin-bottom: 15px;">Imagen Destacada</h4>
+             ${story.thumbnail_url ? html`
+               <img src="${story.thumbnail_url}" style="width: 100%; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e2e8f0;" />
+             ` : ''}
+             <div style="display: flex; gap: 5px; flex-direction: column;">
+               <input type="file" id="thumbnail-input" style="font-size: 0.8em; width: 100%;" accept="image/*" />
+               <button id="btn-upload-thumbnail" class="btn btn-sm btn-secondary" style="width: 100%; margin-top: 5px;">
+                 <i class="fas fa-upload"></i> ${story.thumbnail_url ? 'Cambiar Imagen' : 'Subir Imagen'}
+               </button>
+             </div>
+           </div>
+
            ${story.status === 'pending' ? html`
              <div style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
-               <h4 style="margin-top: 0; margin-bottom: 15px;">Acciones</h4>
+               <h4 style="margin-top: 0; margin-bottom: 15px;">Revisión</h4>
                <button id="btn-approve" class="btn btn-primary" style="width: 100%; margin-bottom: 10px; background: #10b981; border-color: #10b981;">Aprobar</button>
                <button id="btn-reject" class="btn btn-secondary" style="width: 100%; background: #ef4444; color: white; border-color: #ef4444;">Rechazar</button>
              </div>
            ` : ''}
+
+           <!-- Danger Zone -->
+           <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 20px;">
+             <h4 style="margin-top: 0; margin-bottom: 15px; color: #b91c1c;">Zona de Peligro</h4>
+             <button id="btn-delete" class="btn btn-sm btn-secondary" style="width: 100%; background: #fee2e2; color: #b91c1c; border-color: #fca5a5;">
+               <i class="fas fa-trash"></i> Eliminar Historia
+             </button>
+           </div>
         </div>
 
         <!-- Main: Preview -->
@@ -250,6 +272,72 @@ app.get('/:id', async (c) => {
               alert('Error: ' + (data.error || 'Error al rechazar'));
             }
           } catch(e) { alert('Error: ' + e.message); }
+        });
+
+        document.getElementById('btn-delete')?.addEventListener('click', async () => {
+          if (!confirm('¿Estás seguro de que deseas ELIMINAR esta historia permanentemente? Esta acción no se puede deshacer.')) return;
+
+          try {
+            const res = await fetch('/api/admin/stories/' + storyId, { method: 'DELETE' });
+            if (res.ok) {
+              alert('Historia eliminada.');
+              window.location.href = '/admin/stories';
+            } else {
+              const data = await res.json().catch(() => ({}));
+              alert('Error al eliminar: ' + (data.error || 'Error desconocido'));
+            }
+          } catch(e) { alert('Error: ' + e.message); }
+        });
+
+        document.getElementById('btn-upload-thumbnail')?.addEventListener('click', async () => {
+          const input = document.getElementById('thumbnail-input');
+          if (!input.files || input.files.length === 0) {
+             alert('Por favor selecciona una imagen primero.');
+             return;
+          }
+
+          const file = input.files[0];
+          const formData = new FormData();
+          formData.append('file', file);
+
+          const btn = document.getElementById('btn-upload-thumbnail');
+          const originalText = btn.innerText;
+          btn.innerText = 'Subiendo...';
+          btn.disabled = true;
+
+          try {
+             // 1. Upload to R2
+             const uploadRes = await fetch('/admin/upload', {
+               method: 'POST',
+               body: formData
+             });
+             const uploadData = await uploadRes.json();
+
+             if (!uploadRes.ok || !uploadData.success) {
+               throw new Error(uploadData.error || 'Error al subir imagen');
+             }
+
+             const thumbnailUrl = uploadData.url;
+
+             // 2. Update Story
+             const updateRes = await fetch('/api/admin/stories/' + storyId + '/thumbnail', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ thumbnailUrl })
+             });
+
+             if (updateRes.ok) {
+               window.location.reload();
+             } else {
+               const updateData = await updateRes.json();
+               throw new Error(updateData.error || 'Error al actualizar historia');
+             }
+
+          } catch (e) {
+             alert('Error: ' + e.message);
+             btn.innerText = originalText;
+             btn.disabled = false;
+          }
         });
       </script>
     `
