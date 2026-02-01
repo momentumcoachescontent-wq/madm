@@ -82,6 +82,17 @@ export const getLessonsByCourseId = async (db: D1Database, courseId: number, pub
 }
 
 /**
+ * Get ALL fields for lessons by Course ID (Admin internal use for deletion/export)
+ */
+export const getFullLessonsByCourseId = async (db: D1Database, courseId: number): Promise<Lesson[]> => {
+  return dbAll<Lesson>(
+    db,
+    'SELECT * FROM lessons WHERE course_id = ? ORDER BY order_index ASC',
+    [courseId]
+  )
+}
+
+/**
  * Create a new lesson
  */
 export const createLesson = async (db: D1Database, lesson: NewLesson) => {
@@ -147,6 +158,13 @@ export const updateLesson = async (db: D1Database, id: number, lesson: Partial<N
   args.push(id)
 
   return dbRun(db, query, args)
+}
+
+/**
+ * Delete a lesson
+ */
+export const deleteLesson = async (db: D1Database, id: number) => {
+  return dbRun(db, 'DELETE FROM lessons WHERE id = ?', [id])
 }
 
 /**

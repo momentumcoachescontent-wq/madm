@@ -3,6 +3,7 @@ import { CloudflareBindings } from '../../../types'
 import { updateStoryStatus, getStory, deleteStory, updateStoryThumbnail } from '../models/stories'
 import { processStoryApproval } from '../services/story-processor'
 import { getCurrentUser } from '../../../auth-utils'
+import { cleanupContentImages } from '../../../lib/media-cleanup'
 
 const app = new Hono<{ Bindings: CloudflareBindings }>()
 
@@ -88,12 +89,19 @@ app.delete('/:id', async (c) => {
     return c.json({ error: 'Story not found' }, 404)
   }
 
+  // Cleanup aligned images and thumbnail
+  await cleanupContentImages(
+    c.env.IMAGES_BUCKET,
+    [story.story_text, story.analysis_text],
+    [story.thumbnail_url]
+  )
+
   const result = await deleteStory(c.env.DB, id)
   if (result === 0) {
     return c.json({ error: 'Not Found' }, 404)
   }
 
-  // Delete from R2 if needed
+  // Delete from R2 if needed (Original File)
   if (story.r2_key && story.r2_key !== 'text-submission') {
     try {
       await c.env.IMAGES_BUCKET.delete(story.r2_key)

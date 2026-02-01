@@ -123,3 +123,10 @@ export const updateCourse = async (db: D1Database, id: number, course: Partial<N
 
   return dbRun(db, query, args)
 }
+
+/**
+ * Delete a course
+ */
+export const deleteCourse = async (db: D1Database, id: number) => {
+  return dbRun(db, 'DELETE FROM courses WHERE id = ?', [id])
+}

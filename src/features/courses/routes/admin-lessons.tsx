@@ -3,9 +3,11 @@ import { html } from 'hono/html'
 import { AdminLayout } from '../../../admin/layout'
 import { listLessons, getLessonById, createLesson, updateLesson } from '../models/lessons'
 import { listCourses } from '../models/courses'
+import { cleanupContentImages } from '../../../lib/media-cleanup'
 
 type Bindings = {
   DB: D1Database
+  IMAGES_BUCKET: R2Bucket
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -120,6 +122,11 @@ const LessonListHelper = (lessons: any[]) => html`
                 <a href="/admin/lessons/${lesson.id}" class="btn btn-sm btn-secondary">
                   <i class="fas fa-edit"></i>
                 </a>
+                <form method="POST" action="/admin/lessons/${lesson.id}/delete" style="display:inline;" onsubmit="return confirm('¿Eliminar esta lección permanentemente?')">
+                    <button type="submit" class="btn btn-sm btn-outline" style="color: #ef4444; border-color: #ef4444; margin-left: 5px;" title="Eliminar Lección">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
               </td>
             </tr>
           `)}
@@ -238,6 +245,24 @@ app.post('/:id', async (c) => {
     return c.redirect('/admin/lessons')
   } catch (error) {
     return c.text('Error updating lesson: ' + (error as Error).message, 500)
+  }
+})
+
+// DELETE
+app.post('/:id/delete', async (c) => {
+  const { deleteLesson, getLessonById } = await import('../models/lessons')
+  const id = parseInt(c.req.param('id'), 10)
+  if (isNaN(id)) return c.text('Invalid ID', 400)
+
+  try {
+    const lesson = await getLessonById(c.env.DB, id)
+    if (lesson) {
+        await cleanupContentImages(c.env.IMAGES_BUCKET, [lesson.content])
+        await deleteLesson(c.env.DB, id)
+    }
+    return c.redirect('/admin/lessons')
+  } catch (error) {
+    return c.text('Error deleting lesson: ' + (error as Error).message, 500)
   }
 })
 
