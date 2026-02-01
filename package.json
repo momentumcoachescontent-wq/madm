@@ -23,6 +23,9 @@
     "git:status": "git status"
   },
   "dependencies": {
+    "@jsquash/jpeg": "^1.6.0",
+    "@jsquash/png": "^3.1.1",
+    "@jsquash/resize": "^2.1.1",
     "@paypal/paypal-server-sdk": "^2.1.0",
     "@types/diff": "^7.0.2",
     "bcryptjs": "^3.0.3",
