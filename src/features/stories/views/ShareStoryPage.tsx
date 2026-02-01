@@ -101,7 +101,10 @@ export const ShareStoryPage = ({ stories = [] }: ShareStoryPageProps) => {
               input.click();
 
               input.onchange = function() {
+                if (!input.files || input.files.length === 0) return;
                 var file = input.files[0];
+                if (!file) return;
+
                 if (/^image\\//.test(file.type)) {
                   if (file.size > 5 * 1024 * 1024) {
                     alert('La imagen es demasiado grande. El tamaño máximo es 5MB.');
