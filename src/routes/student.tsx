@@ -237,6 +237,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
 
       const courseSlug = c.req.param('courseSlug')
       const lessonId = parseInt(c.req.param('lessonId'))
+      if (Number.isNaN(lessonId)) return c.redirect('/mi-aprendizaje')
 
       // Obtener información del curso
       const course = await getCourseBySlug(c.env.DB, courseSlug)
@@ -697,6 +698,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       const certificateId = parseInt(c.req.param('certificateId'))
+      if (Number.isNaN(certificateId)) return c.redirect('/mi-aprendizaje')
 
       // Obtener certificado con información del usuario y curso
       const certificate = await getCertificateDetails(c.env.DB, certificateId, user.id)
@@ -969,6 +971,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       const { getCourseBySlug } = await import('../models/courses')
       const courseSlug = c.req.param('courseSlug')
       const quizId = parseInt(c.req.param('quizId'))
+      if (Number.isNaN(quizId)) return c.redirect('/mi-aprendizaje')
 
       // Obtener información del curso
       const course = await getCourseBySlug(c.env.DB, courseSlug)
@@ -1300,6 +1303,10 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
       const quizId = parseInt(c.req.param('quizId'))
       const attemptId = parseInt(c.req.param('attemptId'))
 
+      if (Number.isNaN(quizId) || Number.isNaN(attemptId)) {
+        return c.redirect('/mi-aprendizaje')
+      }
+
       // Obtener curso
       const course = await getCourseBySlug(c.env.DB, courseSlug)
 
@@ -1566,6 +1573,7 @@ export function registerStudentRoutes(app: Hono<{ Bindings: CloudflareBindings }
   studentRoutes.get('/checkout/:courseId', async (c) => {
     try {
       const courseId = parseInt(c.req.param('courseId'))
+      if (Number.isNaN(courseId)) return c.redirect('/cursos')
 
       // Verificar autenticación
       const { getCurrentUser } = await import('../auth-utils')

@@ -577,6 +577,9 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       }
 
       const lessonId = parseInt(c.req.param('lessonId'))
+      if (Number.isNaN(lessonId)) {
+        return c.json({ error: 'Invalid lesson ID' }, 400)
+      }
       const { completed, courseId } = await c.req.json()
 
       // Verificar que la lección existe y el usuario tiene acceso
@@ -635,6 +638,9 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       }
 
       const lessonId = parseInt(c.req.param('lessonId'))
+      if (Number.isNaN(lessonId)) {
+        return c.json({ error: 'Invalid lesson ID' }, 400)
+      }
       const { notes, courseId } = await c.req.json()
 
       // Verificar acceso
@@ -666,6 +672,9 @@ export function registerApiRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
       }
 
       const lessonId = parseInt(c.req.param('lessonId'))
+      if (Number.isNaN(lessonId)) {
+        return c.json({ error: 'Invalid lesson ID' }, 400)
+      }
       const { position, duration, courseId } = await c.req.json()
 
       // Verificar acceso
