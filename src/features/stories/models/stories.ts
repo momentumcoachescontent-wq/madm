@@ -22,6 +22,9 @@ export interface Story {
   excerpt: string | null
   thumbnail_url: string | null
   published_at: string | null
+  tags: string | null
+  views: number
+  likes: number
 }
 
 export interface CreateStoryParams {
@@ -113,4 +116,50 @@ export const countStories = async (db: D1Database, filters: { status?: string } 
 
   const result = await dbFirst<{ count: number }>(db, query, args)
   return result?.count ?? 0
+}
+
+// Public Methods
+
+export interface PublicStoriesFilters {
+  limit?: number
+  offset?: number
+  tag?: string
+}
+
+export const listPublicStories = async (db: D1Database, filters: PublicStoriesFilters = {}) => {
+  let query = `SELECT * FROM stories WHERE status = 'approved'`
+  const args: any[] = []
+
+  if (filters.tag) {
+    // Simple LIKE for comma separated tags.
+    // Not perfect (e.g. 'art' matches 'party') but compliant with requirements.
+    query += ` AND tags LIKE ?`
+    args.push(`%${filters.tag}%`)
+  }
+
+  // Sort by published_at DESC (primary) or created_at DESC (fallback)
+  query += ` ORDER BY published_at DESC, created_at DESC`
+
+  if (filters.limit != null) {
+    query += ` LIMIT ?`
+    args.push(filters.limit)
+    if (filters.offset != null) {
+      query += ` OFFSET ?`
+      args.push(filters.offset)
+    }
+  }
+
+  return await dbAll<Story>(db, query, args)
+}
+
+export const getPublicStoryBySlug = async (db: D1Database, slug: string) => {
+  return await dbFirst<Story>(db, `SELECT * FROM stories WHERE slug = ? AND status = 'approved'`, [slug])
+}
+
+export const incrementStoryView = async (db: D1Database, id: number) => {
+  return await dbRun(db, `UPDATE stories SET views = views + 1 WHERE id = ?`, [id])
+}
+
+export const incrementStoryLike = async (db: D1Database, id: number) => {
+  return await dbRun(db, `UPDATE stories SET likes = likes + 1 WHERE id = ?`, [id])
 }

@@ -1,7 +1,15 @@
 import { Hono } from 'hono'
 import { CloudflareBindings } from '../../../types'
 import { ShareStoryPage } from '../views/ShareStoryPage'
-import { createStory } from '../models/stories'
+import { StoriesListPage } from '../views/StoriesListPage'
+import { StoryDetailPage } from '../views/StoryDetailPage'
+import {
+  createStory,
+  listPublicStories,
+  getPublicStoryBySlug,
+  incrementStoryView,
+  incrementStoryLike
+} from '../models/stories'
 import { getCurrentUser } from '../../../auth-utils'
 import { HeroSection } from '../../../views/components/HeroSection'
 import { Button } from '../../../views/components/Button'
@@ -21,15 +29,16 @@ function extractMeta(html: string, targetName: string): string | null {
 }
 
 export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
-  const storiesRoutes = new Hono<{ Bindings: CloudflareBindings }>()
+  // Submission Routes
+  const submissionRoutes = new Hono<{ Bindings: CloudflareBindings }>()
 
   // GET /comparte-tu-historia
-  storiesRoutes.get('/', (c) => {
+  submissionRoutes.get('/', (c) => {
     return c.render(<ShareStoryPage />)
   })
 
   // POST /comparte-tu-historia
-  storiesRoutes.post('/', async (c) => {
+  submissionRoutes.post('/', async (c) => {
     try {
       const body = await c.req.parseBody()
       const file = body['file']
@@ -146,5 +155,67 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
     }
   })
 
-  app.route('/comparte-tu-historia', storiesRoutes)
+  app.route('/comparte-tu-historia', submissionRoutes)
+
+  // Public Stories Routes
+  const publicStoriesRoutes = new Hono<{ Bindings: CloudflareBindings }>()
+
+  // GET /historias - List
+  publicStoriesRoutes.get('/', async (c) => {
+    const page = parseInt(c.req.query('page') || '1')
+    const tag = c.req.query('tag')
+    const limit = 9
+    const offset = (page - 1) * limit
+
+    const stories = await listPublicStories(c.env.DB, {
+      limit: limit + 1, // Fetch one more to check if there are more
+      offset,
+      tag
+    })
+
+    const hasMore = stories.length > limit
+    const displayStories = hasMore ? stories.slice(0, limit) : stories
+
+    return c.render(
+      <StoriesListPage
+        stories={displayStories}
+        page={page}
+        hasMore={hasMore}
+        tag={tag}
+      />
+    )
+  })
+
+  // GET /historias/:slug - Detail
+  publicStoriesRoutes.get('/:slug', async (c) => {
+    const slug = c.req.param('slug')
+    const story = await getPublicStoryBySlug(c.env.DB, slug)
+
+    if (!story) {
+      return c.notFound()
+    }
+
+    // Increment View (Async, don't await strictly if performance matters,
+    // but typically safe to await for simple analytics)
+    await incrementStoryView(c.env.DB, story.id)
+    // Update local count to reflect immediately
+    story.views = (story.views || 0) + 1
+
+    return c.render(<StoryDetailPage story={story} />)
+  })
+
+  // POST /historias/:slug/like - Like
+  publicStoriesRoutes.post('/:slug/like', async (c) => {
+    const slug = c.req.param('slug')
+    const story = await getPublicStoryBySlug(c.env.DB, slug)
+
+    if (story) {
+      await incrementStoryLike(c.env.DB, story.id)
+    }
+
+    // Redirect back to the story page
+    return c.redirect(`/historias/${slug}`)
+  })
+
+  app.route('/historias', publicStoriesRoutes)
 }
