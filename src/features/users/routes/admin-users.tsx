@@ -157,12 +157,15 @@ app.post('/:id', async (c) => {
   }
 
   try {
+    const activeVal = parseInt(body['active'] as string, 10)
+    const emailVerifiedVal = parseInt(body['email_verified'] as string, 10)
+
     await updateUser(c.env.DB, id, {
       name,
       email,
       role: body['role'] as string,
-      active: parseInt(body['active'] as string, 10),
-      email_verified: parseInt(body['email_verified'] as string, 10)
+      active: isNaN(activeVal) ? 0 : activeVal,
+      email_verified: isNaN(emailVerifiedVal) ? 0 : emailVerifiedVal
     })
 
     // Fetch updated user

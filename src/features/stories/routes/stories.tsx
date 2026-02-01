@@ -162,7 +162,10 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
 
   // GET /historias - List
   publicStoriesRoutes.get('/', async (c) => {
-    const page = parseInt(c.req.query('page') || '1')
+    let page = parseInt(c.req.query('page') || '1')
+    if (Number.isNaN(page) || page < 1) {
+      page = 1
+    }
     const tag = c.req.query('tag')
     const limit = 9
     const offset = (page - 1) * limit

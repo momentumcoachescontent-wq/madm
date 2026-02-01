@@ -1422,7 +1422,10 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
       const { listBlogPosts, countBlogPosts } = await import('../models/blog')
 
       // Obtener parámetros de paginación
-      const page = parseInt(c.req.query('page') || '1')
+      let page = parseInt(c.req.query('page') || '1')
+      if (Number.isNaN(page) || page < 1) {
+        page = 1
+      }
       const limit = 12
       const offset = (page - 1) * limit
 
