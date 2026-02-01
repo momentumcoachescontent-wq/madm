@@ -299,6 +299,7 @@ app.get('/:id', async (c) => {
           const file = input.files[0];
           const formData = new FormData();
           formData.append('file', file);
+          formData.append('width', '800'); // Resize for row layout
 
           const btn = document.getElementById('btn-upload-thumbnail');
           const originalHTML = btn.innerHTML;
