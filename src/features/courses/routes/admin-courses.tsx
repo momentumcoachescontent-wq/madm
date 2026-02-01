@@ -2,13 +2,9 @@ import { Hono } from 'hono'
 import { html } from 'hono/html'
 import { AdminLayout } from '../../../admin/layout'
 import { cleanupContentImages } from '../../../lib/media-cleanup'
+import { CloudflareBindings } from '../../../types'
 
-type Bindings = {
-  DB: D1Database
-  IMAGES_BUCKET: R2Bucket
-}
-
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: CloudflareBindings }>()
 
 // Form Helper
 const CourseForm = (course: any = {}) => {
@@ -239,15 +235,23 @@ app.post('/:id/delete', async (c) => {
   try {
     const course = await getCourseById(c.env.DB, id)
     if (course) {
+        const validOrigins: string[] = []
+        if (c.env.MEDIA_ORIGIN) validOrigins.push(c.env.MEDIA_ORIGIN)
+        if (c.env.BASE_URL) {
+            try {
+                validOrigins.push(new URL(c.env.BASE_URL).origin)
+            } catch (e) {}
+        }
+
         // 1. Delete all lessons and their images
         const lessons = await getFullLessonsByCourseId(c.env.DB, id)
         for (const lesson of lessons) {
-            await cleanupContentImages(c.env.IMAGES_BUCKET, [lesson.content])
+            await cleanupContentImages(c.env.IMAGES_BUCKET, [lesson.content], [], validOrigins)
             await deleteLesson(c.env.DB, lesson.id)
         }
 
         // 2. Delete course images
-        await cleanupContentImages(c.env.IMAGES_BUCKET, [course.description], [course.featured_image])
+        await cleanupContentImages(c.env.IMAGES_BUCKET, [course.description], [course.featured_image], validOrigins)
 
         // 3. Delete course
         await deleteCourse(c.env.DB, id)

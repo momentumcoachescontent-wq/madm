@@ -4,13 +4,9 @@ import { AdminLayout } from '../../../admin/layout'
 import { listLessons, getLessonById, createLesson, updateLesson } from '../models/lessons'
 import { listCourses } from '../models/courses'
 import { cleanupContentImages } from '../../../lib/media-cleanup'
+import { CloudflareBindings } from '../../../types'
 
-type Bindings = {
-  DB: D1Database
-  IMAGES_BUCKET: R2Bucket
-}
-
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: CloudflareBindings }>()
 
 // Form Helper
 const LessonForm = (lesson: any = {}, courses: any[] = []) => {
@@ -257,7 +253,14 @@ app.post('/:id/delete', async (c) => {
   try {
     const lesson = await getLessonById(c.env.DB, id)
     if (lesson) {
-        await cleanupContentImages(c.env.IMAGES_BUCKET, [lesson.content])
+        const validOrigins: string[] = []
+        if (c.env.MEDIA_ORIGIN) validOrigins.push(c.env.MEDIA_ORIGIN)
+        if (c.env.BASE_URL) {
+            try {
+                validOrigins.push(new URL(c.env.BASE_URL).origin)
+            } catch (e) {}
+        }
+        await cleanupContentImages(c.env.IMAGES_BUCKET, [lesson.content], [], validOrigins)
         await deleteLesson(c.env.DB, id)
     }
     return c.redirect('/admin/lessons')

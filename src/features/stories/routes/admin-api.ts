@@ -90,10 +90,19 @@ app.delete('/:id', async (c) => {
   }
 
   // Cleanup aligned images and thumbnail
+  const validOrigins: string[] = []
+  if (c.env.MEDIA_ORIGIN) validOrigins.push(c.env.MEDIA_ORIGIN)
+  if (c.env.BASE_URL) {
+    try {
+      validOrigins.push(new URL(c.env.BASE_URL).origin)
+    } catch (e) {}
+  }
+
   await cleanupContentImages(
     c.env.IMAGES_BUCKET,
     [story.story_text, story.analysis_text],
-    [story.thumbnail_url]
+    [story.thumbnail_url],
+    validOrigins
   )
 
   const result = await deleteStory(c.env.DB, id)
