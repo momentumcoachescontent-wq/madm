@@ -196,7 +196,7 @@ app.get('/:id', async (c) => {
            <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 20px; margin-bottom: 20px;">
              <h4 style="margin-top: 0; margin-bottom: 15px;">Imagen Destacada</h4>
              ${story.thumbnail_url ? html`
-               <img src="${story.thumbnail_url}" style="width: 100%; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e2e8f0;" />
+               <img src="${story.thumbnail_url}" alt="${story.meta_title ?? 'Story thumbnail'}" style="width: 100%; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e2e8f0;" />
              ` : ''}
              <div style="display: flex; gap: 5px; flex-direction: column;">
                <input type="file" id="thumbnail-input" style="font-size: 0.8em; width: 100%;" accept="image/*" />
@@ -301,8 +301,8 @@ app.get('/:id', async (c) => {
           formData.append('file', file);
 
           const btn = document.getElementById('btn-upload-thumbnail');
-          const originalText = btn.innerText;
-          btn.innerText = 'Subiendo...';
+          const originalHTML = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
           btn.disabled = true;
 
           try {
@@ -317,7 +317,7 @@ app.get('/:id', async (c) => {
                throw new Error(uploadData.error || 'Error al subir imagen');
              }
 
-             const thumbnailUrl = uploadData.url;
+             const thumbnailUrl = new URL(uploadData.url, window.location.origin).href;
 
              // 2. Update Story
              const updateRes = await fetch('/api/admin/stories/' + storyId + '/thumbnail', {
@@ -335,7 +335,7 @@ app.get('/:id', async (c) => {
 
           } catch (e) {
              alert('Error: ' + e.message);
-             btn.innerText = originalText;
+             btn.innerHTML = originalHTML;
              btn.disabled = false;
           }
         });

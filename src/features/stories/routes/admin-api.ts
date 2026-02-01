@@ -88,17 +88,19 @@ app.delete('/:id', async (c) => {
     return c.json({ error: 'Story not found' }, 404)
   }
 
+  const result = await deleteStory(c.env.DB, id)
+  if (result === 0) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+
   // Delete from R2 if needed
   if (story.r2_key && story.r2_key !== 'text-submission') {
     try {
       await c.env.IMAGES_BUCKET.delete(story.r2_key)
     } catch (e) {
       console.error('Error deleting from R2:', e)
-      // Continue to delete from DB even if R2 fails
     }
   }
-
-  await deleteStory(c.env.DB, id)
 
   return c.json({ success: true })
 })
@@ -125,7 +127,38 @@ app.post('/:id/thumbnail', async (c) => {
       return c.json({ error: 'thumbnailUrl is required' }, 400)
   }
 
-  await updateStoryThumbnail(c.env.DB, id, thumbnailUrl)
+  try {
+    const url = new URL(thumbnailUrl)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return c.json({ error: 'Invalid protocol. Must be http or https.' }, 400)
+    }
+
+    const validOrigins: string[] = []
+    if (c.env.MEDIA_ORIGIN) validOrigins.push(c.env.MEDIA_ORIGIN)
+    if (c.env.BASE_URL) {
+      try {
+        validOrigins.push(new URL(c.env.BASE_URL).origin)
+      } catch (e) {}
+    }
+
+    if (validOrigins.length > 0) {
+      if (!validOrigins.includes(url.origin)) {
+        return c.json({ error: 'Invalid origin' }, 400)
+      }
+    } else {
+      // Allow localhost in development if no env vars set, but typically we should strict fail
+      // Per instructions, we compare against configured values.
+      // If nothing configured, we'll reject to be safe.
+      return c.json({ error: 'Server configuration error: No allowed media origins' }, 500)
+    }
+  } catch (e) {
+    return c.json({ error: 'Invalid URL' }, 400)
+  }
+
+  const changes = await updateStoryThumbnail(c.env.DB, id, thumbnailUrl)
+  if (changes === 0) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
 
   return c.json({ success: true })
 })

@@ -13,4 +13,5 @@ export type CloudflareBindings = {
   BASE_URL: string
   STORE_CLIENT_IP?: string
   MAX_UPLOAD_BYTES?: string
+  MEDIA_ORIGIN?: string
 }
