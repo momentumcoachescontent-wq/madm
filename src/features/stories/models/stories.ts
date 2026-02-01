@@ -107,6 +107,24 @@ export const updateStoryStatus = async (
   return result.changes
 }
 
+export const updateStoryThumbnail = async (
+  db: D1Database,
+  id: number,
+  thumbnailUrl: string
+) => {
+  const result = await dbRun(
+    db,
+    `UPDATE stories SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [thumbnailUrl, id]
+  )
+  return result.changes
+}
+
+export const deleteStory = async (db: D1Database, id: number) => {
+  const result = await dbRun(db, `DELETE FROM stories WHERE id = ?`, [id])
+  return result.changes
+}
+
 export const countStories = async (db: D1Database, filters: { status?: string } = {}) => {
   let query = `SELECT COUNT(*) as count FROM stories`
   const args: any[] = []
