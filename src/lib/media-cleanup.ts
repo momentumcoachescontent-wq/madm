@@ -9,7 +9,8 @@ const getMediaKey = (url: string, allowedOrigins: string[] = []): string | null 
 
     // Handle relative paths starting with /media/
     if (url.startsWith('/media/')) {
-        return url.replace('/media/', '') || null;
+        const path = url.split('?')[0]; // Strip query params
+        return path.replace('/media/', '') || null;
     }
 
     // Handle absolute URLs

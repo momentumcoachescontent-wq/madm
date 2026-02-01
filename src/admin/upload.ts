@@ -1,7 +1,5 @@
 import { Hono } from 'hono'
-import { decode as decodeJpeg, encode as encodeJpeg } from '@jsquash/jpeg'
-import { decode as decodePng } from '@jsquash/png'
-import resize from '@jsquash/resize'
+import { processImage } from '../lib/image-processing'
 
 type Bindings = {
   IMAGES_BUCKET: R2Bucket
@@ -18,50 +16,15 @@ app.post('/', async (c) => {
       return c.json({ error: 'No file uploaded' }, 400)
     }
 
-    let fileData: ArrayBuffer | ReadableStream = file.stream()
-    let contentType = file.type
-    // contentLength isn't strictly needed for R2 put as it calculates it, or we pass buffer.
-
-    // Resizing Logic
+    // Parse target width
     const widthStr = body['width']
+    let targetWidth: number | undefined
     if (widthStr && typeof widthStr === 'string' && /^\d+$/.test(widthStr)) {
-        const targetWidth = parseInt(widthStr, 10)
-        // Limit max width to avoid memory issues and abuse
-        if (targetWidth > 0 && targetWidth <= 2000) {
-            try {
-                // Determine format
-                let imageData: ImageData | null = null
-                const buffer = await file.arrayBuffer()
-
-                if (file.type === 'image/jpeg' || file.type === 'image/jpg') {
-                    imageData = await decodeJpeg(buffer)
-                } else if (file.type === 'image/png') {
-                    imageData = await decodePng(buffer)
-                }
-
-                if (imageData) {
-                    // Calculate height to maintain aspect ratio
-                    const targetHeight = Math.round(imageData.height * (targetWidth / imageData.width))
-
-                    const resizedData = await resize(imageData, {
-                        width: targetWidth,
-                        height: targetHeight
-                    })
-
-                    // Always encode to JPEG for thumbnails to ensure consistency and compression
-                    const newBuffer = await encodeJpeg(resizedData)
-
-                    fileData = newBuffer
-                    contentType = 'image/jpeg'
-                }
-            } catch (e) {
-                console.error('Resize failed, falling back to original:', e)
-                // fileData remains file.stream() (or we should reset it? file.stream() creates a new stream from Blob)
-                fileData = file.stream()
-                contentType = file.type
-            }
-        }
+        targetWidth = parseInt(widthStr, 10)
     }
+
+    // Process Image (Resize/Convert if needed)
+    const { data: fileData, contentType } = await processImage(file, targetWidth)
 
     // Sanitize filename
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')

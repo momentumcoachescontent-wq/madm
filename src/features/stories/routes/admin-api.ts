@@ -4,6 +4,7 @@ import { updateStoryStatus, getStory, deleteStory, updateStoryThumbnail } from '
 import { processStoryApproval } from '../services/story-processor'
 import { getCurrentUser } from '../../../auth-utils'
 import { cleanupContentImages } from '../../../lib/media-cleanup'
+import { processImage } from '../../../lib/image-processing'
 
 const app = new Hono<{ Bindings: CloudflareBindings }>()
 
@@ -193,6 +194,85 @@ app.post('/:id/thumbnail', async (c) => {
   }
 
   return c.json({ success: true })
+})
+
+app.post('/:id/thumbnail-upload', async (c) => {
+  const idStr = c.req.param('id')
+  if (!/^\d+$/.test(idStr)) return c.json({ error: 'Invalid ID' }, 400)
+  const id = Number(idStr)
+
+  const user = await getCurrentUser(c)
+  if (!user || user.role !== 'admin') {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const story = await getStory(c.env.DB, id)
+  if (!story) {
+    return c.json({ error: 'Story not found' }, 404)
+  }
+
+  // Parse Body
+  let body: any
+  try {
+      body = await c.req.parseBody()
+  } catch (e) {
+      return c.json({ error: 'Invalid Form Data' }, 400)
+  }
+
+  const file = body['file']
+  if (!file || !(file instanceof File)) {
+      return c.json({ error: 'No file uploaded' }, 400)
+  }
+
+  // Determine Target Width
+  let targetWidth: number | undefined = 800
+  if (body['width']) {
+      const w = parseInt(body['width'] as string, 10)
+      if (!Number.isNaN(w)) targetWidth = w
+  }
+
+  // Process Image
+  const { data: fileData, contentType } = await processImage(file, targetWidth)
+
+  // Deterministic Key
+  const newKey = `stories/${id}/thumbnail.jpg`
+
+  // Cleanup Old Thumbnail if different
+  if (story.thumbnail_url) {
+      let existingKey: string | null = null
+      const url = story.thumbnail_url
+
+      if (url.startsWith('/media/')) {
+          existingKey = url.replace('/media/', '').split('?')[0]
+      } else {
+          try {
+              const u = new URL(url)
+              if (u.pathname.startsWith('/media/')) {
+                  existingKey = u.pathname.replace('/media/', '')
+              }
+          } catch(e) {}
+      }
+
+      // If existing key is valid and NOT the new key, delete it.
+      if (existingKey && existingKey !== newKey) {
+          try {
+              await c.env.IMAGES_BUCKET.delete(existingKey)
+          } catch (e) {
+              console.error('Error deleting old thumbnail:', e)
+          }
+      }
+  }
+
+  // Upload New (Overwrite)
+  await c.env.IMAGES_BUCKET.put(newKey, fileData, {
+      httpMetadata: { contentType }
+  })
+
+  // Update DB with Cache Busting
+  const newUrl = `/media/${newKey}?v=${Date.now()}`
+  await updateStoryThumbnail(c.env.DB, id, newUrl)
+
+  return c.json({ success: true, url: newUrl })
 })
 
 export default app
