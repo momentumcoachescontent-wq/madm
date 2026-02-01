@@ -43,9 +43,14 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
   submissionRoutes.post('/', async (c) => {
     try {
       const body = await c.req.parseBody()
-      const storyText = body['story_text'] as string
+      const storyTextRaw = body['story_text']
+      let storyText = ''
 
-      if (!storyText || !storyText.trim()) {
+      if (typeof storyTextRaw === 'string') {
+        storyText = storyTextRaw.trim()
+      }
+
+      if (!storyText) {
         return c.render(
           <div>
             <HeroSection title="Error" subtitle="Por favor revisa tu envío." variant="small" />

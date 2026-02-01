@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { csrf } from 'hono/csrf'
 import { renderer } from './renderer'
 import { CloudflareBindings } from './types'
 import { registerPublicRoutes } from './routes/public'
@@ -28,6 +29,13 @@ app.use(
 )
 
 app.use(renderer)
+
+app.use(async (c, next) => {
+  if (c.req.path.startsWith('/api/webhooks')) {
+    return next()
+  }
+  return csrf()(c, next)
+})
 
 registerWebhookRoutes(app)
 registerApiRoutes(app)
