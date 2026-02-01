@@ -13,82 +13,105 @@ export const processStoryApproval = async (db: D1Database, bucket: R2Bucket, sto
     return
   }
 
-  // 2. Fetch content from R2
+  // 2. Fetch content from R2 OR use stored text
   if (!story.r2_key) {
     console.error(`[StoryProcessor] Story ${storyId} has no R2 key`)
     return
   }
 
-  let rawHtml = ''
-  try {
-    const object = await bucket.get(story.r2_key)
-    if (!object) {
-      console.error(`[StoryProcessor] R2 object ${story.r2_key} not found`)
+  let title = 'Untitled Story'
+  let author = 'Anónimo'
+  let storyText = ''
+  let analysisText: string | null = null
+  let excerpt = ''
+  let thumbnail: string | null = null
+
+  if (story.r2_key === 'text-submission') {
+    // TEXT SUBMISSION FLOW
+    storyText = story.story_text || ''
+    title = story.meta_title || 'Untitled Story'
+    author = story.meta_author || story.submitter_alias || 'Anónimo'
+
+    // Generate Excerpt
+    const trimmed = storyText.trim()
+    excerpt = trimmed ? trimmed.substring(0, 200).trim() + (trimmed.length > 200 ? '...' : '') : ''
+
+    // No analysis or thumbnail for text submissions
+
+  } else {
+    // LEGACY / HTML FILE FLOW
+    let rawHtml = ''
+    try {
+      const object = await bucket.get(story.r2_key)
+      if (!object) {
+        console.error(`[StoryProcessor] R2 object ${story.r2_key} not found`)
+        return
+      }
+      rawHtml = await object.text()
+    } catch (e) {
+      console.error(`[StoryProcessor] Error fetching R2 object:`, e)
       return
     }
-    rawHtml = await object.text()
-  } catch (e) {
-    console.error(`[StoryProcessor] Error fetching R2 object:`, e)
-    return
+
+    // 3. Sanitize (security cleanup)
+    // Use existing sanitizeHtml (removes scripts, iframes, dangerous attributes)
+    const cleanHtml = sanitizeHtml(rawHtml)
+
+    // 4. Load into Cheerio for extraction and further processing
+    const $ = cheerio.load(cleanHtml)
+
+    // Remove ALL links (keep text)
+    $('a').each((_, el) => {
+      $(el).replaceWith($(el).text())
+    })
+
+    // 5. Extract Metadata
+
+    // Title: meta madm:title > title > Story Meta Title > Untitled
+    title =
+      $('meta[name="madm:title"]').attr('content') ||
+      $('title').text() ||
+      story.meta_title ||
+      'Untitled Story'
+
+    // Author: meta madm:author > alias > Anonymous
+    author =
+      $('meta[name="madm:author"]').attr('content') ||
+      story.submitter_alias ||
+      'Anónimo'
+
+    // Story Text: section[data-madm="story"] > body
+    const storySection = $('section[data-madm="story"]')
+    if (storySection.length > 0) {
+      storyText = storySection.text().trim()
+    } else {
+      // If we fallback to body, we should ideally exclude analysis if it exists separately
+      const bodyClone = $('body').clone()
+      bodyClone.find('section[data-madm="analysis"]').remove()
+      storyText = bodyClone.text().trim()
+    }
+
+    // Analysis
+    const analysisSection = $('section[data-madm="analysis"]')
+    analysisText = analysisSection.length > 0 ? analysisSection.text().trim() : null
+
+    // Excerpt
+    excerpt =
+      $('meta[name="madm:excerpt"]').attr('content') ||
+      $('meta[name="description"]').attr('content') ||
+      ''
+
+    if (!excerpt) {
+      const trimmed = storyText?.trim() ?? ''
+      excerpt = trimmed ? trimmed.substring(0, 200).trim() + (trimmed.length > 200 ? '...' : '') : ''
+    }
+
+    // Thumbnail
+    thumbnail =
+      $('meta[property="og:image"]').attr('content') ||
+      $('meta[name="madm:thumbnail"]').attr('content') ||
+      null
   }
-
-  // 3. Sanitize (security cleanup)
-  // Use existing sanitizeHtml (removes scripts, iframes, dangerous attributes)
-  const cleanHtml = sanitizeHtml(rawHtml)
-
-  // 4. Load into Cheerio for extraction and further processing
-  const $ = cheerio.load(cleanHtml)
-
-  // Remove ALL links (keep text)
-  $('a').each((_, el) => {
-    $(el).replaceWith($(el).text())
-  })
-
-  // 5. Extract Metadata
-
-  // Title: meta madm:title > title > Story Meta Title > Untitled
-  const title =
-    $('meta[name="madm:title"]').attr('content') ||
-    $('title').text() ||
-    story.meta_title ||
-    'Untitled Story'
-
-  // Author: meta madm:author > alias > Anonymous
-  const author =
-    $('meta[name="madm:author"]').attr('content') ||
-    story.submitter_alias ||
-    'Anónimo'
-
-  // Story Text: section[data-madm="story"] > body
-  let storyText = ''
-  const storySection = $('section[data-madm="story"]')
-  if (storySection.length > 0) {
-    storyText = storySection.text().trim()
-  } else {
-    // If we fallback to body, we should ideally exclude analysis if it exists separately
-    const bodyClone = $('body').clone()
-    bodyClone.find('section[data-madm="analysis"]').remove()
-    storyText = bodyClone.text().trim()
-  }
-
-  // Analysis
-  const analysisSection = $('section[data-madm="analysis"]')
-  const analysisText = analysisSection.length > 0 ? analysisSection.text().trim() : null
-
-  // Excerpt
-  let excerpt =
-    $('meta[name="madm:excerpt"]').attr('content') ||
-    $('meta[name="description"]').attr('content')
-
-  if (!excerpt) {
-    const trimmed = storyText?.trim() ?? ''
-    excerpt = trimmed ? trimmed.substring(0, 200).trim() + (trimmed.length > 200 ? '...' : '') : ''
-  }
-
-  // Thumbnail
-  const thumbnail =
-    $('meta[property="og:image"]').attr('content') ||
-    $('meta[name="madm:thumbnail"]').attr('content')
 
   // Slug: Generate random string (UUID)
   const slug = crypto.randomUUID()

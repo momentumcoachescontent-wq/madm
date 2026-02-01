@@ -139,13 +139,20 @@ app.get('/:id', async (c) => {
 
   // Fetch Content
   let content = 'Error al cargar el contenido'
-  try {
-     const obj = await c.env.IMAGES_BUCKET.get(story.r2_key)
-     if (obj) {
-       content = await obj.text()
-     }
-  } catch (e) {
-    console.error('Error fetching R2:', e)
+  let isTextSubmission = false
+
+  if (story.r2_key === 'text-submission') {
+    content = story.story_text || 'Sin contenido de texto.'
+    isTextSubmission = true
+  } else {
+    try {
+       const obj = await c.env.IMAGES_BUCKET.get(story.r2_key)
+       if (obj) {
+         content = await obj.text()
+       }
+    } catch (e) {
+      console.error('Error fetching R2:', e)
+    }
   }
 
   // Sanitize
@@ -197,7 +204,7 @@ app.get('/:id', async (c) => {
         <!-- Main: Preview -->
         <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
            <h2 style="margin-top: 0; margin-bottom: 20px;">Vista Previa: ${story.meta_title}</h2>
-           <div style="border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; background: #fafafa; min-height: 400px;">
+           <div style="border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; background: #fafafa; min-height: 400px; ${isTextSubmission ? 'white-space: pre-wrap;' : ''}">
              ${html`${safeHtmlContent}`}
            </div>
         </div>
