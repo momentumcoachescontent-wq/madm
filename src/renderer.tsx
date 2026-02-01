@@ -18,6 +18,9 @@ export const renderer = jsxRenderer(({ children }) => {
         {/* Custom Styles */}
         <link href="/static/style.css" rel="stylesheet" />
         
+        {/* Quill Editor Styles */}
+        <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
+
         {/* Google Fonts */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin />
