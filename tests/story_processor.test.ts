@@ -174,4 +174,75 @@ describe('Story Processor', () => {
       expect(excerpt).toBe('') // Should not be undefined
     }
   })
+
+  it('should preserve existing thumbnail during text submission', async () => {
+    const mockStory = {
+      id: 4,
+      r2_key: 'text-submission',
+      thumbnail_url: 'https://persisted.com/image.jpg',
+      story_text: 'Some text content'
+    }
+
+    const bindMock = vi.fn().mockImplementation((...args) => {
+      return {
+        first: vi.fn().mockResolvedValue(mockStory),
+        run: vi.fn().mockResolvedValue({ meta: { changes: 1 } }),
+        all: vi.fn().mockResolvedValue([])
+      }
+    })
+
+    const prepareMock = vi.fn().mockReturnValue({ bind: bindMock })
+    const mockDb = { prepare: prepareMock }
+    const mockBucket = {
+      get: vi.fn().mockResolvedValue(null) // Should not call get for text submission anyway
+    }
+
+    await processStoryApproval(mockDb as any, mockBucket as any, 4)
+
+    const bindCalls = bindMock.mock.calls
+    const updateArgs = bindCalls.find(args => args[7] === 4 && args.length === 8)
+
+    expect(updateArgs).toBeDefined()
+    if (updateArgs) {
+      const [_, __, ___, ____, thumbnail] = updateArgs as any[]
+      expect(thumbnail).toBe('https://persisted.com/image.jpg')
+    }
+  })
+
+  it('should preserve existing thumbnail during HTML submission if extraction yields nothing', async () => {
+    const mockStory = {
+      id: 5,
+      r2_key: 'html-key-5',
+      thumbnail_url: 'https://persisted.com/image-5.jpg'
+    }
+
+    const htmlContent = `<html><body>No meta here</body></html>`
+
+    const bindMock = vi.fn().mockImplementation((...args) => {
+      return {
+        first: vi.fn().mockResolvedValue(mockStory),
+        run: vi.fn().mockResolvedValue({ meta: { changes: 1 } }),
+        all: vi.fn().mockResolvedValue([])
+      }
+    })
+
+    const prepareMock = vi.fn().mockReturnValue({ bind: bindMock })
+    const mockDb = { prepare: prepareMock }
+    const mockBucket = {
+      get: vi.fn().mockResolvedValue({
+        text: vi.fn().mockResolvedValue(htmlContent)
+      })
+    }
+
+    await processStoryApproval(mockDb as any, mockBucket as any, 5)
+
+    const bindCalls = bindMock.mock.calls
+    const updateArgs = bindCalls.find(args => args[7] === 5 && args.length === 8)
+
+    expect(updateArgs).toBeDefined()
+    if (updateArgs) {
+      const [_, __, ___, ____, thumbnail] = updateArgs as any[]
+      expect(thumbnail).toBe('https://persisted.com/image-5.jpg')
+    }
+  })
 })

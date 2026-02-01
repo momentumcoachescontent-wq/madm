@@ -24,7 +24,7 @@ export const processStoryApproval = async (db: D1Database, bucket: R2Bucket, sto
   let storyText = ''
   let analysisText: string | null = null
   let excerpt = ''
-  let thumbnail: string | null = null
+  let thumbnail: string | null = story.thumbnail_url || null
 
   if (story.r2_key === 'text-submission') {
     // TEXT SUBMISSION FLOW
@@ -107,10 +107,14 @@ export const processStoryApproval = async (db: D1Database, bucket: R2Bucket, sto
     }
 
     // Thumbnail
-    thumbnail =
+    const extractedThumbnail =
       $('meta[property="og:image"]').attr('content') ||
       $('meta[name="madm:thumbnail"]').attr('content') ||
       null
+
+    if (!thumbnail && extractedThumbnail) {
+      thumbnail = extractedThumbnail
+    }
   }
 
   // Slug: Generate random string (UUID)
