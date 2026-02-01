@@ -18,7 +18,14 @@ const app = new Hono<{ Bindings: CloudflareBindings }>()
 app.use('*', adminMiddleware)
 
 // Helper: Dashboard View
-const DashboardHelper = (postsCount: number, usersCount: number, coursesCount: number, lessonsCount: number) => html`
+const DashboardHelper = (
+  postsCount: number,
+  usersCount: number,
+  coursesCount: number,
+  lessonsCount: number,
+  storiesCount: number,
+  pendingStoriesCount: number
+) => html`
     <div style="margin-bottom: 40px;">
       <h1 style="font-size: 2.5rem; color: #1e293b; margin-bottom: 10px;">Panel de Administración</h1>
       <p style="color: #64748b; font-size: 1.2rem;">Bienvenido al centro de control de Más Allá del Miedo</p>
@@ -86,6 +93,22 @@ const DashboardHelper = (postsCount: number, usersCount: number, coursesCount: n
         </div>
       </a>
 
+      <!-- Stories Card -->
+      <a href="/admin/stories" style="text-decoration: none; color: inherit;">
+        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; height: 100%; border-left: 5px solid #ec4899;">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+            <i class="fas fa-book-open fa-3x" style="color: #ec4899;"></i>
+            <span style="background: #fdf2f8; color: #ec4899; padding: 5px 12px; border-radius: 20px; font-weight: 600;">Historias</span>
+          </div>
+          <h2 style="font-size: 1.5rem; margin-bottom: 10px; color: #1e293b;">Historias</h2>
+          <p style="color: #64748b;">Revisar y gestionar historias de usuarios.</p>
+          <div style="margin-top: 20px; font-size: 2rem; font-weight: 700; color: #ec4899;">
+            ${storiesCount} Total
+            <span style="font-size: 0.5em; color: #9ca3af; font-weight: 500; margin-left: 10px;">(${pendingStoriesCount} pendientes)</span>
+          </div>
+        </div>
+      </a>
+
       <!-- Media Card -->
       <a href="/admin/media" style="text-decoration: none; color: inherit;">
         <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; height: 100%; border-left: 5px solid #10b981;">
@@ -107,16 +130,26 @@ app.get('/', async (c) => {
   const { countUsers } = await import('../models/users')
   const { countCourses } = await import('../models/courses')
   const { countLessons } = await import('../models/lessons')
+  const { countStories } = await import('../features/stories/models/stories')
 
   // Fetch stats
   const postsCount = await countBlogPosts(c.env.DB)
   const usersCount = await countUsers(c.env.DB)
   const coursesCount = await countCourses(c.env.DB)
   const lessonsCount = await countLessons(c.env.DB)
+  const storiesCount = await countStories(c.env.DB)
+  const pendingStoriesCount = await countStories(c.env.DB, { status: 'pending' })
 
   return c.html(AdminLayout({
     title: 'Dashboard',
-    children: DashboardHelper(postsCount, usersCount, coursesCount, lessonsCount),
+    children: DashboardHelper(
+      postsCount,
+      usersCount,
+      coursesCount,
+      lessonsCount,
+      storiesCount,
+      pendingStoriesCount
+    ),
     activeItem: 'dashboard'
   }))
 })
