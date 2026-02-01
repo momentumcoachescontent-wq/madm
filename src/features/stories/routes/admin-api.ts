@@ -141,11 +141,6 @@ app.post('/:id/thumbnail', async (c) => {
       } catch (e) {}
     }
 
-    // Also allow current request origin (e.g. for preview deployments)
-    try {
-      validOrigins.push(new URL(c.req.url).origin)
-    } catch (e) {}
-
     if (validOrigins.length > 0) {
       if (!validOrigins.includes(url.origin)) {
         return c.json({ error: 'Invalid origin' }, 400)

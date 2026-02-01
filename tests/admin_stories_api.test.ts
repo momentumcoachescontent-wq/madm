@@ -108,6 +108,27 @@ describe('Admin Stories API', () => {
       expect(updateStoryThumbnail).toHaveBeenCalledWith(mockDB, 123, 'https://my-site.com/image.jpg')
     })
 
+    it('rejects origin matching request host but not in configuration', async () => {
+      vi.mocked(getCurrentUser).mockResolvedValue(mockAdmin)
+
+      // Simulate a request coming to 'https://attacker.com'
+      // The user tries to set a thumbnail also on 'https://attacker.com'
+      // This should fail because attacker.com is not in MEDIA_ORIGIN or BASE_URL
+      const res = await app.request('https://attacker.com/123/thumbnail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thumbnailUrl: 'https://attacker.com/image.jpg' })
+      }, {
+        DB: mockDB,
+        MEDIA_ORIGIN: 'https://example.com'
+      })
+
+      expect(res.status).toBe(400)
+      const data = await res.json()
+      expect(data.error).toContain('Invalid origin')
+      expect(updateStoryThumbnail).not.toHaveBeenCalled()
+    })
+
     it('returns 404 if story not found (update returns 0)', async () => {
       vi.mocked(getCurrentUser).mockResolvedValue(mockAdmin)
       vi.mocked(updateStoryThumbnail).mockResolvedValue(0) // 0 rows changed
