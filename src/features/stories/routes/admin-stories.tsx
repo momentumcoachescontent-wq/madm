@@ -318,7 +318,7 @@ app.get('/:id', async (c) => {
                throw new Error(uploadData.error || 'Error al subir imagen');
              }
 
-             const thumbnailUrl = new URL(uploadData.url, window.location.origin).href;
+             const thumbnailUrl = uploadData.url;
 
              // 2. Update Story
              const updateRes = await fetch('/api/admin/stories/' + storyId + '/thumbnail', {
