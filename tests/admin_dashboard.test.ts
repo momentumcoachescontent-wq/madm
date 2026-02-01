@@ -32,13 +32,13 @@ vi.mock('../src/features/stories/models/stories', () => ({
 }))
 
 // Mock sub-apps
-vi.mock('./blog', () => ({ default: new Hono() }))
-vi.mock('./upload', () => ({ default: new Hono() }))
-vi.mock('./media', () => ({ default: new Hono() }))
-vi.mock('./users', () => ({ default: new Hono() }))
-vi.mock('./courses', () => ({ default: new Hono() }))
-vi.mock('./lessons', () => ({ default: new Hono() }))
-vi.mock('../features/stories/routes/admin-stories', () => ({ default: new Hono() }))
+vi.mock('../src/admin/blog', () => ({ default: new Hono() }))
+vi.mock('../src/admin/upload', () => ({ default: new Hono() }))
+vi.mock('../src/admin/media', () => ({ default: new Hono() }))
+vi.mock('../src/admin/users', () => ({ default: new Hono() }))
+vi.mock('../src/admin/courses', () => ({ default: new Hono() }))
+vi.mock('../src/admin/lessons', () => ({ default: new Hono() }))
+vi.mock('../src/features/stories/routes/admin-stories', () => ({ default: new Hono() }))
 
 describe('Admin Dashboard', () => {
   let app: Hono<{ Bindings: CloudflareBindings }>
