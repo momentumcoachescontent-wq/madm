@@ -97,6 +97,9 @@ app.delete('/:id', async (c) => {
       validOrigins.push(new URL(c.env.BASE_URL).origin)
     } catch (e) {}
   }
+  try {
+    validOrigins.push(new URL(c.req.url).origin)
+  } catch (e) {}
 
   await cleanupContentImages(
     c.env.IMAGES_BUCKET,
@@ -144,37 +147,40 @@ app.post('/:id/thumbnail', async (c) => {
       return c.json({ error: 'thumbnailUrl is required' }, 400)
   }
 
-  try {
-    const url = new URL(thumbnailUrl)
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      return c.json({ error: 'Invalid protocol. Must be http or https.' }, 400)
-    }
-
-    const validOrigins: string[] = []
-    if (c.env.MEDIA_ORIGIN) validOrigins.push(c.env.MEDIA_ORIGIN)
-    if (c.env.BASE_URL) {
-      try {
-        validOrigins.push(new URL(c.env.BASE_URL).origin)
-      } catch (e) {}
-    }
-
-    // Also allow the current request's origin (e.g. preview environments)
+  // Allow relative URLs (starting with /) without further validation
+  if (!thumbnailUrl.startsWith('/')) {
     try {
-      validOrigins.push(new URL(c.req.url).origin)
-    } catch (e) {}
-
-    if (validOrigins.length > 0) {
-      if (!validOrigins.includes(url.origin)) {
-        return c.json({ error: 'Invalid origin' }, 400)
+      const url = new URL(thumbnailUrl)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return c.json({ error: 'Invalid protocol. Must be http or https.' }, 400)
       }
-    } else {
-      // Allow localhost in development if no env vars set, but typically we should strict fail
-      // Per instructions, we compare against configured values.
-      // If nothing configured, we'll reject to be safe.
-      return c.json({ error: 'Server configuration error: No allowed media origins' }, 500)
+
+      const validOrigins: string[] = []
+      if (c.env.MEDIA_ORIGIN) validOrigins.push(c.env.MEDIA_ORIGIN)
+      if (c.env.BASE_URL) {
+        try {
+          validOrigins.push(new URL(c.env.BASE_URL).origin)
+        } catch (e) {}
+      }
+
+      // Also allow the current request's origin (e.g. preview environments)
+      try {
+        validOrigins.push(new URL(c.req.url).origin)
+      } catch (e) {}
+
+      if (validOrigins.length > 0) {
+        if (!validOrigins.includes(url.origin)) {
+          return c.json({ error: 'Invalid origin' }, 400)
+        }
+      } else {
+        // Allow localhost in development if no env vars set, but typically we should strict fail
+        // Per instructions, we compare against configured values.
+        // If nothing configured, we'll reject to be safe.
+        return c.json({ error: 'Server configuration error: No allowed media origins' }, 500)
+      }
+    } catch (e) {
+      return c.json({ error: 'Invalid URL' }, 400)
     }
-  } catch (e) {
-    return c.json({ error: 'Invalid URL' }, 400)
   }
 
   const changes = await updateStoryThumbnail(c.env.DB, id, thumbnailUrl)

@@ -55,6 +55,22 @@ describe('Admin Stories API', () => {
       expect(updateStoryThumbnail).toHaveBeenCalledWith(mockDB, 123, 'https://example.com/image.jpg')
     })
 
+    it('updates thumbnail with relative URL', async () => {
+      vi.mocked(getCurrentUser).mockResolvedValue(mockAdmin)
+      vi.mocked(updateStoryThumbnail).mockResolvedValue(1)
+
+      const res = await app.request('/123/thumbnail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thumbnailUrl: '/media/image.jpg' })
+      }, {
+        DB: mockDB
+      })
+
+      expect(res.status).toBe(200)
+      expect(updateStoryThumbnail).toHaveBeenCalledWith(mockDB, 123, '/media/image.jpg')
+    })
+
     it('rejects invalid protocol (ftp)', async () => {
       vi.mocked(getCurrentUser).mockResolvedValue(mockAdmin)
 
@@ -152,6 +168,11 @@ describe('Admin Stories API', () => {
       vi.mocked(getStory).mockResolvedValue({ id: 123, r2_key: 'some-key' } as any)
       vi.mocked(deleteStory).mockResolvedValue(1) // Success
 
+      // Since we can't easily inspect cleanupContentImages arguments without mocking it,
+      // we rely on the fact that if it throws (e.g. invalid URL), this test might fail if exception wasn't caught.
+      // But cleanupContentImages swallows errors.
+      // We assume correct logic if response is 200.
+
       const res = await app.request('/123', {
         method: 'DELETE'
       }, {
@@ -163,9 +184,6 @@ describe('Admin Stories API', () => {
       expect(deleteStory).toHaveBeenCalledWith(mockDB, 123)
       // Check R2 delete was called
       expect(mockBucket.delete).toHaveBeenCalledWith('some-key')
-
-      // Ensure order: deleteStory called, and because we mock success, R2 is called.
-      // In a real integration test we'd check timestamps, but here we assume logic flow.
     })
 
     it('returns 404 if deleteStory fails (returns 0)', async () => {
