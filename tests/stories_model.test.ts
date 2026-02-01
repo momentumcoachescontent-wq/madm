@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { listStories, updateStoryStatus } from '../src/features/stories/models/stories'
+import { listStories, updateStoryStatus, createStory } from '../src/features/stories/models/stories'
 
 describe('Stories Model', () => {
   let mockDB: any
@@ -60,5 +60,29 @@ describe('Stories Model', () => {
     mockDB.run.mockResolvedValueOnce({ meta: { changes: 0 } })
     const result2 = await updateStoryStatus(mockDB, 999, 'rejected', 1, 'Bad')
     expect(result2).toBe(0)
+  })
+
+  it('createStory: inserts story_text', async () => {
+    mockDB.run.mockResolvedValueOnce({ meta: { changes: 1 } })
+
+    const params = {
+      user_id: 1,
+      r2_key: 'text-submission',
+      original_filename: 'text.txt',
+      meta_title: 'My Story',
+      meta_author: 'Me',
+      ip_address: '127.0.0.1',
+      story_text: 'Once upon a time...'
+    }
+
+    await createStory(mockDB, params)
+
+    const callArgs = mockDB.prepare.mock.calls[0]
+    const query = callArgs[0]
+    expect(query).toContain('story_text')
+
+    const bindArgs = mockDB.bind.mock.calls[0]
+    // Expected order: user_id, r2_key, original_filename, meta_title, meta_author, ip_address, story_text
+    expect(bindArgs[6]).toBe('Once upon a time...')
   })
 })

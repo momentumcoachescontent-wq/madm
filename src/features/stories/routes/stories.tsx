@@ -33,60 +33,31 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
   const submissionRoutes = new Hono<{ Bindings: CloudflareBindings }>()
 
   // GET /comparte-tu-historia
-  submissionRoutes.get('/', (c) => {
-    return c.render(<ShareStoryPage />)
+  submissionRoutes.get('/', async (c) => {
+    // Fetch recent public stories to display at the top
+    const stories = await listPublicStories(c.env.DB, { limit: 3 })
+    return c.render(<ShareStoryPage stories={stories} />)
   })
 
   // POST /comparte-tu-historia
   submissionRoutes.post('/', async (c) => {
     try {
       const body = await c.req.parseBody()
-      const file = body['file']
+      const storyText = body['story_text'] as string
 
-      if (!file || !(file instanceof File)) {
-        return c.text('No file uploaded', 400)
+      if (!storyText || !storyText.trim()) {
+        return c.render(
+          <div>
+            <HeroSection title="Error" subtitle="Por favor revisa tu envío." variant="small" />
+            <section className="section">
+              <div className="container" style={{ textAlign: 'center' }}>
+                <p className="text-red-500">Por favor, escribe tu historia.</p>
+                <Button href="/comparte-tu-historia" variant="primary">Volver a intentar</Button>
+              </div>
+            </section>
+          </div>
+        )
       }
-
-      // Basic Validation (Double check server side)
-      if (!file.name.endsWith('.html') && file.type !== 'text/html') {
-        return c.text('Invalid file type. Only .html is allowed.', 400)
-      }
-
-      // Check Size
-      let maxBytes = 3 * 1024 * 1024 // Default 3MB
-      if (c.env.MAX_UPLOAD_BYTES && /^\d+$/.test(c.env.MAX_UPLOAD_BYTES)) {
-        const parsed = parseInt(c.env.MAX_UPLOAD_BYTES, 10)
-        if (!Number.isNaN(parsed) && parsed > 0) {
-          maxBytes = parsed
-        }
-      }
-
-      if (file.size > maxBytes) {
-        return c.text('File too large', 413)
-      }
-
-      // Read content for metadata extraction
-      const content = await file.text()
-
-      // Validate Metadata
-      const meta_title = extractMeta(content, 'madm:title')
-      const meta_author = extractMeta(content, 'madm:author')
-      const hasStorySection = /<section\s+[^>]*data-madm\s*=\s*["']story["'][^>]*>/i.test(content)
-
-      if (!meta_title || !meta_author || !hasStorySection) {
-        return c.text('Invalid file format. Missing required metadata or sections.', 400)
-      }
-
-      // Upload to R2
-      const timestamp = Date.now()
-      const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-      const r2Key = `stories/${timestamp}-${sanitizedFilename}`
-
-      await c.env.IMAGES_BUCKET.put(r2Key, content, {
-        httpMetadata: {
-          contentType: 'text/html',
-        },
-      })
 
       // Get User (if logged in)
       const user = await getCurrentUser(c)
@@ -104,20 +75,15 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
       }
 
       // Create DB Record
-      try {
-        await createStory(c.env.DB, {
-          user_id: userId,
-          r2_key: r2Key,
-          original_filename: file.name,
-          meta_title,
-          meta_author,
-          ip_address: ipAddress
-        })
-      } catch (e) {
-        // Cleanup R2
-        await c.env.IMAGES_BUCKET.delete(r2Key)
-        throw e
-      }
+      await createStory(c.env.DB, {
+        user_id: userId,
+        r2_key: 'text-submission',
+        original_filename: 'text-submission.txt',
+        meta_title: 'Historia compartida',
+        meta_author: 'Anónimo',
+        ip_address: ipAddress,
+        story_text: storyText
+      })
 
       // Return Success View
       return c.render(
@@ -137,12 +103,6 @@ export function registerStoriesRoutes(app: Hono<{ Bindings: CloudflareBindings }
                  Tu historia ha sido enviada correctamente. Nuestro equipo la revisará para asegurar
                  que cumple con las normas de la comunidad antes de ser publicada.
                </p>
-               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '40px' }}>
-                 <p style={{ margin: 0, color: '#64748b' }}>
-                   <strong>ID de Envío:</strong> {r2Key.split('/')[1]}<br/>
-                   <strong>Estado:</strong> <span className="badge badge-warning" style={{ background: '#fef3c7', color: '#d97706', padding: '4px 8px', borderRadius: '4px', fontSize: '0.9em' }}>Pendiente de moderación</span>
-                 </p>
-               </div>
                <Button href="/" variant="primary">Volver al Inicio</Button>
              </div>
            </section>

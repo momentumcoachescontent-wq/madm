@@ -34,12 +34,13 @@ export interface CreateStoryParams {
   meta_title?: string | null
   meta_author?: string | null
   ip_address?: string | null
+  story_text?: string | null
 }
 
 export const createStory = async (db: D1Database, params: CreateStoryParams) => {
   const query = `
-    INSERT INTO stories (user_id, r2_key, original_filename, meta_title, meta_author, ip_address)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO stories (user_id, r2_key, original_filename, meta_title, meta_author, ip_address, story_text)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `
   const args = [
     params.user_id,
@@ -47,7 +48,8 @@ export const createStory = async (db: D1Database, params: CreateStoryParams) => 
     params.original_filename,
     params.meta_title ?? null,
     params.meta_author ?? null,
-    params.ip_address ?? null
+    params.ip_address ?? null,
+    params.story_text ?? null
   ]
   return await dbRun(db, query, args)
 }
