@@ -11,6 +11,8 @@ import { registerWebhookRoutes } from './routes/webhooks'
 import { registerAiRoutes } from './routes/ai'
 import { registerStoriesRoutes } from './features/stories/routes/stories'
 
+const csrfMiddleware = csrf()
+
 const app = new Hono<{ Bindings: CloudflareBindings }>()
 
 app.use(
@@ -34,7 +36,7 @@ app.use(async (c, next) => {
   if (c.req.path.startsWith('/api/webhooks')) {
     return next()
   }
-  return csrf()(c, next)
+  return csrfMiddleware(c, next)
 })
 
 registerWebhookRoutes(app)
