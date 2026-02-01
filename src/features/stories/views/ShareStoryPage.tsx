@@ -64,12 +64,12 @@ export const ShareStoryPage = ({ stories = [] }: ShareStoryPageProps) => {
 
             <form action="/comparte-tu-historia" method="POST" id="storyForm">
               <div className="mb-6">
-                <label htmlFor="editor-container" className="block text-sm font-medium text-slate-700 mb-2">
+                <label id="story-editor-label" className="block text-sm font-medium text-slate-700 mb-2">
                   Tu Historia
                 </label>
 
                 {/* Quill Editor Container */}
-                <div id="editor-container" style={{ height: '400px', backgroundColor: 'white' }}></div>
+                <div id="editor-container" aria-labelledby="story-editor-label" style={{ height: '400px', backgroundColor: 'white' }}></div>
 
                 {/* Hidden input to store the HTML content */}
                 <input type="hidden" name="story_text" id="story_text" />
@@ -85,42 +85,107 @@ export const ShareStoryPage = ({ stories = [] }: ShareStoryPageProps) => {
         </div>
       </section>
 
-      {/* Quill Dependencies */}
-      <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
-      <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-
       {/* Initialization Script */}
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function() {
-          var quill = new Quill('#editor-container', {
-            theme: 'snow',
-            placeholder: 'Escribe aquí tu historia... Puedes pegar imágenes directamente.',
-            modules: {
-              toolbar: [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                ['blockquote', 'code-block'],
-                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                [{ 'color': [] }, { 'background': [] }],
-                ['link', 'image'],
-                ['clean']
-              ]
-            }
-          });
+          var script = document.createElement('script');
+          script.src = 'https://cdn.quilljs.com/1.3.6/quill.js';
+          script.onload = function() {
+            var Delta = Quill.import('delta');
 
-          var form = document.getElementById('storyForm');
-          form.onsubmit = function() {
-            // Populate hidden input with HTML content
-            var storyText = document.querySelector('input[name=story_text]');
-            // Use root.innerHTML to get the full HTML content
-            storyText.value = quill.root.innerHTML;
+            // Custom Image Handler
+            function imageHandler() {
+              var input = document.createElement('input');
+              input.setAttribute('type', 'file');
+              input.setAttribute('accept', 'image/*');
+              input.click();
 
-            // Basic validation
-            if (quill.getText().trim().length === 0) {
-              alert('Por favor escribe algo en tu historia.');
-              return false;
+              input.onchange = function() {
+                var file = input.files[0];
+                if (/^image\\//.test(file.type)) {
+                  if (file.size > 5 * 1024 * 1024) {
+                    alert('La imagen es demasiado grande. El tamaño máximo es 5MB.');
+                    return;
+                  }
+
+                  var reader = new FileReader();
+                  reader.onload = function(e) {
+                    var range = quill.getSelection(true);
+                    quill.insertEmbed(range.index, 'image', e.target.result);
+                    quill.setSelection(range.index + 1);
+                  };
+                  reader.readAsDataURL(file);
+                } else {
+                  alert('Solo puedes subir imágenes.');
+                }
+              };
             }
+
+            var quill = new Quill('#editor-container', {
+              theme: 'snow',
+              placeholder: 'Escribe aquí tu historia... Puedes pegar imágenes directamente.',
+              modules: {
+                toolbar: {
+                  container: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    ['blockquote', 'code-block'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'color': [] }, { 'background': [] }],
+                    ['link', 'image'],
+                    ['clean']
+                  ],
+                  handlers: {
+                    image: imageHandler
+                  }
+                }
+              }
+            });
+
+            // Clipboard Matcher for Paste Validation
+            quill.clipboard.addMatcher(Node.ELEMENT_NODE, function(node, delta) {
+              if (node.tagName === 'IMG') {
+                var src = node.getAttribute('src');
+                if (src && src.startsWith('data:image')) {
+                  // Approximate size validation for pasted images
+                  var base64Length = src.length - (src.indexOf(',') + 1);
+                  var padding = (src.charAt(src.length - 1) === '=') ? ((src.charAt(src.length - 2) === '=') ? 2 : 1) : 0;
+                  var fileSize = (base64Length * 0.75) - padding;
+
+                  if (fileSize > 5 * 1024 * 1024) {
+                    alert('La imagen pegada excede el límite de 5MB.');
+                    return new Delta(); // Return empty delta to block insertion
+                  }
+                }
+              }
+              return delta;
+            });
+
+            var form = document.getElementById('storyForm');
+            form.onsubmit = function(e) {
+              // Basic validation
+              if (quill.getText().trim().length === 0) {
+                alert('Por favor escribe algo en tu historia.');
+                e.preventDefault();
+                return false;
+              }
+
+              // Content Size Validation (5MB Limit)
+              var htmlContent = quill.root.innerHTML;
+              var contentSize = new Blob([htmlContent]).size;
+
+              if (contentSize > 5 * 1024 * 1024) {
+                alert('El contenido total de la historia excede el límite de 5MB. Por favor reduce el tamaño de las imágenes.');
+                e.preventDefault();
+                return false;
+              }
+
+              // Populate hidden input with HTML content
+              var storyText = document.querySelector('input[name=story_text]');
+              storyText.value = htmlContent;
+            };
           };
+          document.head.appendChild(script);
         });
       ` }} />
     </div>
