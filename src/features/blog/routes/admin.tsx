@@ -3,13 +3,9 @@ import { html, raw } from 'hono/html'
 import { VersioningService, Version } from '../../../lib/versioning'
 import { AdminLayout } from '../../../admin/layout'
 import { cleanupContentImages } from '../../../lib/media-cleanup'
+import { CloudflareBindings } from '../../../types'
 
-type Bindings = {
-  DB: D1Database
-  IMAGES_BUCKET: R2Bucket
-}
-
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: CloudflareBindings }>()
 
 // Helper: Versions List
 const VersionsListHelper = (versions: any[]) => { return html`
@@ -487,10 +483,19 @@ app.post('/:id/delete', async (c) => {
       const post = await getBlogPostById(c.env.DB, parseInt(id))
       if (post) {
           // Cleanup images
+          const validOrigins: string[] = []
+          if (c.env.MEDIA_ORIGIN) validOrigins.push(c.env.MEDIA_ORIGIN)
+          if (c.env.BASE_URL) {
+            try {
+              validOrigins.push(new URL(c.env.BASE_URL).origin)
+            } catch (e) {}
+          }
+
           await cleanupContentImages(
               c.env.IMAGES_BUCKET,
               [post.content],
-              [post.image_url]
+              [post.image_url],
+              validOrigins
           )
 
           await deleteBlogPost(c.env.DB, parseInt(id))
