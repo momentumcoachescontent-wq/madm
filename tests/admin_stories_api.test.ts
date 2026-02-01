@@ -160,6 +160,21 @@ describe('Admin Stories API', () => {
       const data = await res.json()
       expect(data.error).toBe('Not Found')
     })
+
+    it('rejects protocol-relative URLs starting with //', async () => {
+      vi.mocked(getCurrentUser).mockResolvedValue(mockAdmin)
+
+      const res = await app.request('/123/thumbnail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thumbnailUrl: '//evil.com/image.jpg' })
+      }, {
+        DB: mockDB,
+        MEDIA_ORIGIN: 'https://example.com'
+      })
+
+      expect(res.status).toBe(400)
+    })
   })
 
   describe('DELETE /:id', () => {

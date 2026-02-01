@@ -147,6 +147,10 @@ app.post('/:id/thumbnail', async (c) => {
       return c.json({ error: 'thumbnailUrl is required' }, 400)
   }
 
+  if (thumbnailUrl.startsWith('//')) {
+    return c.json({ error: 'Protocol-relative URLs are not allowed' }, 400)
+  }
+
   // Allow relative URLs (starting with /) without further validation
   if (!thumbnailUrl.startsWith('/')) {
     try {
