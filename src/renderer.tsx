@@ -5,12 +5,18 @@ import { CloudflareBindings } from './types';
 
 export const renderer = jsxRenderer(({ children }, c: Context<{ Bindings: CloudflareBindings }>) => {
   const gaId = c.env?.GA_MEASUREMENT_ID;
+  const gaIdRegex = /^(G-[A-Z0-9]+|UA-\d+-\d+)$/;
+  const isValidGaId = gaId && gaIdRegex.test(gaId);
+
+  if (gaId && !isValidGaId) {
+    console.warn(`Invalid GA_MEASUREMENT_ID: ${gaId}`);
+  }
 
   return (
     <html lang="es">
       <head>
         <meta charset="UTF-8" />
-        {gaId && (
+        {isValidGaId && (
           <>
             <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>
             <script>
