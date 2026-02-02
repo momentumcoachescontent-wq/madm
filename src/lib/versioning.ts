@@ -17,6 +17,21 @@ export interface Version {
 export class VersioningService {
   private db: D1Database
 
+  // Blacklist of columns that should never be versioned or cause conflicts
+  private readonly systemColumns = [
+    'id',
+    'created_at',
+    'updated_at',
+    'published',
+    'views',
+    'likes',
+    'featured',
+    'enrollment_count',
+    'rating',
+    'status',
+    'created_by'
+  ]
+
   constructor(db: D1Database) {
     this.db = db
   }
@@ -46,29 +61,6 @@ export class VersioningService {
   }
 
   /**
-   * Get valid columns for versioning per entity type
-   */
-  private getValidColumns(entityType: EntityType): string[] {
-      switch (entityType) {
-          case 'blog_post':
-              return ['title', 'slug', 'content', 'excerpt', 'image_url', 'hashtags', 'scheduled_at']
-          case 'course':
-              return [
-                  'slug', 'title', 'subtitle', 'description', 'duration_weeks', 'level',
-                  'price', 'currency', 'featured_image', 'instructor_name', 'instructor_bio',
-                  'what_you_learn', 'course_content', 'requirements', 'target_audience', 'testimonials'
-              ]
-          case 'lesson':
-              return [
-                  'module_number', 'lesson_number', 'title', 'description', 'video_url',
-                  'video_duration', 'content', 'order_index', 'is_preview'
-              ]
-          default:
-              return []
-      }
-  }
-
-  /**
    * Create a new version
    */
   async createVersion(
@@ -80,20 +72,17 @@ export class VersioningService {
   ): Promise<number> {
     const table = this.getTableName(entityType)
     const fk = this.getForeignKey(entityType)
-    const validColumns = this.getValidColumns(entityType)
 
-    // Filter data to only include valid columns
+    // Filter data to exclude system columns
     const filteredData: Record<string, any> = {}
-    validColumns.forEach(col => {
-        if (data[col] !== undefined) {
-            filteredData[col] = data[col]
+    Object.keys(data).forEach(key => {
+        if (!this.systemColumns.includes(key)) {
+            filteredData[key] = data[key]
         }
     })
 
     if (Object.keys(filteredData).length === 0) {
         console.warn(`No valid version data found for ${entityType} ID ${entityId}`)
-        // Should we throw? Or just create an empty version metadata?
-        // Let's proceed, maybe it's just a status update.
     }
 
     const keys = Object.keys(filteredData)
