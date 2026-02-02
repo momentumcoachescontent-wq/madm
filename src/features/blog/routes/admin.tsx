@@ -269,7 +269,10 @@ const PostForm = (post: any = {}, isDraft: boolean = false, latestPublished: any
 // LIST
 app.get('/', async (c) => {
   const { listBlogPosts } = await import('../../../models/blog')
-  const posts = await listBlogPosts(c.env.DB, { orderBy: 'created_at' })
+  const posts = await listBlogPosts(c.env.DB, {
+    orderBy: 'created_at',
+    columns: ['id', 'title', 'slug', 'published', 'scheduled_at', 'views', 'created_at']
+  })
 
   return c.html(AdminLayout({
     title: 'Gestión de Blog',

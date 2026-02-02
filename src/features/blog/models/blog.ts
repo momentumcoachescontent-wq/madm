@@ -35,6 +35,7 @@ export interface ListBlogPostsOptions {
   offset?: number
   excludeId?: number
   orderBy?: 'created_at' | 'random' | 'scheduled_at'
+  columns?: string[]
 }
 
 /**
@@ -61,7 +62,8 @@ export const getBlogPostBySlug = async (db: D1Database, slug: string, opts: { pu
  * List blog posts with various filters
  */
 export const listBlogPosts = async (db: D1Database, opts: ListBlogPostsOptions = {}): Promise<BlogPost[]> => {
-  let query = 'SELECT * FROM blog_posts'
+  const columns = opts.columns ? opts.columns.join(', ') : '*'
+  let query = `SELECT ${columns} FROM blog_posts`
   const args: any[] = []
   const conditions: string[] = []
 

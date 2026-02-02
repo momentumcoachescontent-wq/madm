@@ -60,11 +60,16 @@ export const listCourses = async (db: D1Database): Promise<Course[]> => {
   return dbAll<Course>(db, 'SELECT * FROM courses ORDER BY created_at DESC')
 }
 
+export interface ListCourseOptions {
+  columns?: string[]
+}
+
 /**
  * List published courses (Public)
  */
-export const listPublishedCourses = async (db: D1Database): Promise<Course[]> => {
-  return dbAll<Course>(db, 'SELECT * FROM courses WHERE published = 1 ORDER BY created_at DESC')
+export const listPublishedCourses = async (db: D1Database, opts: ListCourseOptions = {}): Promise<Course[]> => {
+  const columns = opts.columns ? opts.columns.join(', ') : '*'
+  return dbAll<Course>(db, `SELECT ${columns} FROM courses WHERE published = 1 ORDER BY created_at DESC`)
 }
 
 /**

@@ -65,8 +65,13 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
       ]
 
       // Dynamic Routes
-      const posts = await listBlogPosts(c.env.DB, { publishedOnly: true })
-      const courses = await listPublishedCourses(c.env.DB)
+      const posts = await listBlogPosts(c.env.DB, {
+        publishedOnly: true,
+        columns: ['slug', 'updated_at', 'created_at']
+      })
+      const courses = await listPublishedCourses(c.env.DB, {
+        columns: ['slug', 'updated_at', 'created_at']
+      })
 
       let xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
       xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -1434,7 +1439,8 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
         publishedOnly: true,
         limit,
         offset,
-        orderBy: 'scheduled_at'
+        orderBy: 'scheduled_at',
+        columns: ['id', 'title', 'slug', 'excerpt', 'image_url', 'hashtags', 'created_at']
       })
 
       // Contar total de posts
@@ -1566,7 +1572,8 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
         publishedOnly: true,
         excludeId: post.id,
         limit: 3,
-        orderBy: 'random'
+        orderBy: 'random',
+        columns: ['id', 'title', 'slug', 'excerpt', 'image_url']
       })
 
       return c.render(
@@ -1680,7 +1687,9 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
   publicRoutes.get('/cursos', async (c) => {
     try {
       const { listPublishedCourses } = await import('../models/courses')
-      const courses = await listPublishedCourses(c.env.DB)
+      const courses = await listPublishedCourses(c.env.DB, {
+        columns: ['id', 'title', 'slug', 'subtitle', 'level', 'duration_weeks', 'price', 'currency', 'featured_image', 'featured', 'enrollment_count', 'rating']
+      })
 
       return c.render(
         <div>
