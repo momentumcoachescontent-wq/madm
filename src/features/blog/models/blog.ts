@@ -1,5 +1,6 @@
 import { dbFirst, dbAll, dbRun } from '../../../models/db'
 import { sanitizeHtml } from '../../../lib/sanitize'
+import { getValidEntityColumns } from '../../../lib/versioning'
 
 export interface BlogPost {
   id: number
@@ -62,8 +63,17 @@ export const getBlogPostBySlug = async (db: D1Database, slug: string, opts: { pu
  * List blog posts with various filters
  */
 export const listBlogPosts = async (db: D1Database, opts: ListBlogPostsOptions = {}): Promise<BlogPost[]> => {
-  const columns = opts.columns ? opts.columns.join(', ') : '*'
-  let query = `SELECT ${columns} FROM blog_posts`
+  const validColumns = getValidEntityColumns('blog_post')
+  let selectedColumns = '*'
+
+  if (opts.columns && opts.columns.length > 0) {
+    const filtered = opts.columns.filter(c => validColumns.includes(c))
+    if (filtered.length > 0) {
+      selectedColumns = filtered.join(', ')
+    }
+  }
+
+  let query = `SELECT ${selectedColumns} FROM blog_posts`
   const args: any[] = []
   const conditions: string[] = []
 
