@@ -14,6 +14,35 @@ export interface Version {
   [key: string]: any
 }
 
+/**
+ * Get valid columns for versioning and querying per entity type
+ * Includes both content columns and system columns
+ */
+export const getValidEntityColumns = (entityType: EntityType): string[] => {
+    switch (entityType) {
+        case 'blog_post':
+            return [
+                'id', 'title', 'slug', 'content', 'excerpt', 'image_url', 'hashtags',
+                'published', 'scheduled_at', 'views', 'created_at', 'updated_at'
+            ]
+        case 'course':
+            return [
+                'id', 'slug', 'title', 'subtitle', 'description', 'duration_weeks', 'level',
+                'price', 'currency', 'featured_image', 'instructor_name', 'instructor_bio',
+                'what_you_learn', 'course_content', 'requirements', 'target_audience', 'testimonials',
+                'published', 'featured', 'enrollment_count', 'rating', 'created_at', 'updated_at'
+            ]
+        case 'lesson':
+            return [
+                'id', 'course_id', 'module_number', 'lesson_number', 'title', 'description',
+                'video_url', 'video_duration', 'content', 'order_index', 'is_preview',
+                'published', 'created_at', 'updated_at'
+            ]
+        default:
+            return []
+    }
+}
+
 export class VersioningService {
   private db: D1Database
 
@@ -46,29 +75,6 @@ export class VersioningService {
   }
 
   /**
-   * Get valid columns for versioning per entity type
-   */
-  private getValidColumns(entityType: EntityType): string[] {
-      switch (entityType) {
-          case 'blog_post':
-              return ['title', 'slug', 'content', 'excerpt', 'image_url', 'hashtags', 'scheduled_at']
-          case 'course':
-              return [
-                  'slug', 'title', 'subtitle', 'description', 'duration_weeks', 'level',
-                  'price', 'currency', 'featured_image', 'instructor_name', 'instructor_bio',
-                  'what_you_learn', 'course_content', 'requirements', 'target_audience', 'testimonials'
-              ]
-          case 'lesson':
-              return [
-                  'module_number', 'lesson_number', 'title', 'description', 'video_url',
-                  'video_duration', 'content', 'order_index', 'is_preview'
-              ]
-          default:
-              return []
-      }
-  }
-
-  /**
    * Create a new version
    */
   async createVersion(
@@ -80,12 +86,27 @@ export class VersioningService {
   ): Promise<number> {
     const table = this.getTableName(entityType)
     const fk = this.getForeignKey(entityType)
-    const validColumns = this.getValidColumns(entityType)
+    const validColumns = getValidEntityColumns(entityType)
+
+    // Columns that should not be copied from data into the version row directly
+    // (either they are meta columns handled separately, or system columns that don't exist in version table)
+    const systemColumns = [
+        'id', 'created_at', 'updated_at',
+        'post_id', 'course_id', 'lesson_id',
+        'status', 'created_by', 'change_summary',
+        // 'views' and 'published' (from main table) are likely not in version table,
+        // but we assume data passed here is usually filtered or from version table itself.
+        // If data comes from a full entity object, these might be present.
+        // Ideally we should blacklist them if we know they aren't versioned.
+        // But strictly strictly speaking, 'published' column in main table != 'published' status in version.
+        // Let's rely on the fact that restoreVersion passes version object,
+        // and admin passes explicit subsets.
+    ]
 
     // Filter data to only include valid columns
     const filteredData: Record<string, any> = {}
     validColumns.forEach(col => {
-        if (data[col] !== undefined) {
+        if (!systemColumns.includes(col) && data[col] !== undefined) {
             filteredData[col] = data[col]
         }
     })

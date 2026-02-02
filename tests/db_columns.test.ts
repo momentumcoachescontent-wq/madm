@@ -32,6 +32,20 @@ describe('Database Columns Optimization', () => {
     )
   })
 
+  it('listBlogPosts should filter out invalid columns', async () => {
+    await listBlogPosts(mockDB, { columns: ['slug', 'invalid_col', 'drop table'] })
+    expect(mockPrepare).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT slug FROM blog_posts')
+    )
+  })
+
+  it('listBlogPosts should fallback to * if all columns are invalid', async () => {
+    await listBlogPosts(mockDB, { columns: ['invalid_col'] })
+    expect(mockPrepare).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM blog_posts')
+    )
+  })
+
   it('listPublishedCourses should select all columns by default', async () => {
     await listPublishedCourses(mockDB)
     expect(mockPrepare).toHaveBeenCalledWith(
@@ -43,6 +57,20 @@ describe('Database Columns Optimization', () => {
     await listPublishedCourses(mockDB, { columns: ['slug', 'price'] })
     expect(mockPrepare).toHaveBeenCalledWith(
         expect.stringContaining('SELECT slug, price FROM courses')
+    )
+  })
+
+  it('listPublishedCourses should filter out invalid columns', async () => {
+    await listPublishedCourses(mockDB, { columns: ['slug', 'invalid_col'] })
+    expect(mockPrepare).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT slug FROM courses')
+    )
+  })
+
+  it('listPublishedCourses should fallback to * if all columns are invalid', async () => {
+    await listPublishedCourses(mockDB, { columns: ['invalid_col'] })
+    expect(mockPrepare).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM courses')
     )
   })
 })

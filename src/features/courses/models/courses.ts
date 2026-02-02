@@ -1,4 +1,5 @@
 import { dbFirst, dbAll, dbRun } from '../../../models/db'
+import { getValidEntityColumns } from '../../../lib/versioning'
 
 export interface Course {
   id: number
@@ -68,8 +69,17 @@ export interface ListCourseOptions {
  * List published courses (Public)
  */
 export const listPublishedCourses = async (db: D1Database, opts: ListCourseOptions = {}): Promise<Course[]> => {
-  const columns = opts.columns ? opts.columns.join(', ') : '*'
-  return dbAll<Course>(db, `SELECT ${columns} FROM courses WHERE published = 1 ORDER BY created_at DESC`)
+  const validColumns = getValidEntityColumns('course')
+  let selectedColumns = '*'
+
+  if (opts.columns && opts.columns.length > 0) {
+    const filtered = opts.columns.filter(c => validColumns.includes(c))
+    if (filtered.length > 0) {
+      selectedColumns = filtered.join(', ')
+    }
+  }
+
+  return dbAll<Course>(db, `SELECT ${selectedColumns} FROM courses WHERE published = 1 ORDER BY created_at DESC`)
 }
 
 /**
