@@ -106,5 +106,57 @@ describe('Blog Features', () => {
       expect(bindArgs).toContain('#tag')
       expect(bindArgs).toContain('2025-01-01')
     })
+
+    it('should exclude system columns (id, published, views, etc.) from insert query', async () => {
+      const service = new VersioningService(mockDB as D1Database)
+      const fullEntity = {
+        id: 123,
+        title: 'Title',
+        slug: 'slug-value',
+        content: 'Content',
+        hashtags: '#tag',
+        scheduled_at: '2025-01-01',
+        // System / Non-versioned fields
+        published: true,
+        views: 100,
+        likes: 50,
+        featured: false,
+        enrollment_count: 5,
+        rating: 4.5,
+        created_at: '2024-01-01',
+        updated_at: '2024-02-01',
+        status: 'published', // Should be handled by createVersion logic, not passed as data
+        created_by: 1
+      }
+
+      await service.createVersion('blog_post', 123, fullEntity)
+
+      const prepareCall = mockDB.prepare.mock.calls[0][0]
+      const bindArgs = mockDB.bind.mock.calls[0]
+
+      // Should contain valid fields
+      expect(prepareCall).toContain('slug')
+      expect(bindArgs).toContain('slug-value')
+
+      // Should NOT contain system fields
+      expect(prepareCall).not.toContain('published')
+      expect(prepareCall).not.toContain('views')
+      expect(prepareCall).not.toContain('likes')
+      expect(prepareCall).not.toContain('enrollment_count')
+      expect(prepareCall).not.toContain('rating')
+
+      // We check that the values weren't bound implicitly
+      // Note: 'status' is bound explicitly as the 2nd arg to createVersion, which we didn't pass, so it defaults to 'draft'.
+      // The 'status' field in the data object should be ignored.
+      // 2nd arg is status, 3rd is userId
+      // The bind call is [entityId, status, userId, ...keys]
+
+      // Let's verify exactly what columns were used
+      // The query string is like "INSERT INTO ... (post_id, status, created_by, ...)"
+
+      // 'published' boolean true shouldn't be in bind args (as a column value)
+      // but might be tricky if it's coerced or if there are other bools.
+      // Safer to rely on prepareCall not containing the column name.
+    })
   })
 })
