@@ -14,4 +14,5 @@ export type CloudflareBindings = {
   STORE_CLIENT_IP?: string
   MAX_UPLOAD_BYTES?: string
   MEDIA_ORIGIN?: string
+  GA_MEASUREMENT_ID?: string
 }

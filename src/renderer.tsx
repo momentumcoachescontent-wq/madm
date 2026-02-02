@@ -1,10 +1,29 @@
 import { jsxRenderer } from 'hono/jsx-renderer';
+import { Context } from 'hono';
+import { html } from 'hono/html';
+import { CloudflareBindings } from './types';
 
-export const renderer = jsxRenderer(({ children }) => {
+export const renderer = jsxRenderer(({ children }, c: Context<{ Bindings: CloudflareBindings }>) => {
+  const gaId = c.env?.GA_MEASUREMENT_ID;
+
   return (
     <html lang="es">
       <head>
         <meta charset="UTF-8" />
+        {gaId && (
+          <>
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>
+            <script>
+              {html`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+
+                gtag('config', '${gaId}');
+              `}
+            </script>
+          </>
+        )}
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Más Allá del Miedo - Transforma el miedo en claridad y poder personal</title>
         <meta name="description" content="Herramientas psicológicas para jóvenes: aprende a detectar manipulación, construir límites sanos y liderar tu propia vida con claridad y poder personal." />
