@@ -731,24 +731,24 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
 
             <div className="resources-list">
             {/* New AI Tool Banner */}
-            <div style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); border-radius: 12px; padding: 30px; margin-bottom: 50px; color: white; display: flex; align-items: center; gap: 30px; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3); flex-wrap: wrap;">
-              <div style="flex: 0 0 80px; text-align: center;">
+            <div className="ai-banner">
+              <div className="ai-banner-icon">
                  <i className="fas fa-robot fa-4x"></i>
               </div>
-              <div style="flex: 1; min-width: 250px;">
-                 <h3 style="font-size: 1.5rem; margin-bottom: 10px; color: white;">Nuevo: Analiza tu caso con IA</h3>
-                 <p style="opacity: 0.9;">Cuéntale tu situación a nuestro asistente inteligente y recibe un análisis inmediato y recomendaciones personalizadas.</p>
+              <div className="ai-banner-content">
+                 <h3>Nuevo: Analiza tu caso con IA</h3>
+                 <p>Cuéntale tu situación a nuestro asistente inteligente y recibe un análisis inmediato y recomendaciones personalizadas.</p>
               </div>
               <div>
-                 <a href="/asistente-ia" target="_blank" rel="noopener noreferrer" className="btn btn-light">
+                 <a href="/n" target="_blank" rel="noopener noreferrer" className="btn btn-light">
                    <i className="fas fa-arrow-right"></i> Probar Ahora
                  </a>
               </div>
             </div>
 
             {/* EL UMBRAL - BANNER */}
-            <a href="/el-umbral" target="_blank" className="umbral-banner" style={{gridColumn: '1 / -1'}}>
-              <h2>Atréve-te a explorar el umbral y sorpréndete</h2>
+            <a href="/el-umbral" className="umbral-banner" style={{gridColumn: '1 / -1'}}>
+              <h2>Atrévete a explorar el umbral y sorpréndete</h2>
             </a>
 
               <div className="resource-detail-card">
