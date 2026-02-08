@@ -1,5 +1,5 @@
 # Use Node.js 22 Alpine as the base image
-FROM node:22-alpine
+FROM node:25-alpine
 
 # Install su-exec for user switching
 RUN apk add --no-cache su-exec
