@@ -17,6 +17,7 @@ def run():
         ai_banner = page.locator(".ai-banner")
         ai_banner.screenshot(path="verification_ai_banner.png")
 
+        page.wait_for_selector(".umbral-banner", state="visible")
         umbral_banner = page.locator(".umbral-banner")
         umbral_banner.screenshot(path="verification_umbral_banner.png")
 

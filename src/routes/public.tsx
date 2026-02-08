@@ -740,7 +740,7 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
                  <p>Cuéntale tu situación a nuestro asistente inteligente y recibe un análisis inmediato y recomendaciones personalizadas.</p>
               </div>
               <div>
-                 <a href="/n" target="_blank" rel="noopener noreferrer" className="btn btn-light">
+                 <a href="/asistente-ia" target="_blank" rel="noopener noreferrer" className="btn btn-light">
                    <i className="fas fa-arrow-right"></i> Probar Ahora
                  </a>
               </div>
