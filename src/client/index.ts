@@ -3,6 +3,7 @@ import * as stripe from './stripe';
 import * as quiz from './quiz';
 import * as video from './video-tracking';
 import * as certificate from './certificate';
+import * as umbral from './umbral';
 
 declare global {
   interface Window {
@@ -10,7 +11,7 @@ declare global {
   }
 }
 
-window.ADM = { auth, stripe, quiz, video, certificate };
+window.ADM = { auth, stripe, quiz, video, certificate, umbral };
 
 // Helpers
 function on(pathPrefix: string) {
@@ -58,5 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Video tracking: only if videos exist
   if (has('video') || has('[data-video-tracking]')) {
     safeRun('video.init', () => video.init());
+  }
+
+  // El Umbral: only if container exists
+  if (has('#el-umbral-app')) {
+    safeRun('umbral.initUmbral', () => umbral.initUmbral());
   }
 });
