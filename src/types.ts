@@ -16,4 +16,5 @@ export type CloudflareBindings = {
   MEDIA_ORIGIN?: string
   GA_MEASUREMENT_ID?: string
   MCP_API_KEY: string
+  OPENAI_API_KEY: string
 }

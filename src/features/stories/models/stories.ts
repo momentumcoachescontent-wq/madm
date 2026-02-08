@@ -183,3 +183,25 @@ export const incrementStoryView = async (db: D1Database, id: number) => {
 export const incrementStoryLike = async (db: D1Database, id: number) => {
   return await dbRun(db, `UPDATE stories SET likes = likes + 1 WHERE id = ?`, [id])
 }
+
+export interface SearchStoriesParams {
+  query: string
+  limit?: number
+}
+
+export const searchStories = async (db: D1Database, params: SearchStoriesParams) => {
+  const sql = `
+    SELECT id, slug, meta_title, excerpt, published_at
+    FROM stories
+    WHERE status = 'approved'
+    AND (
+      meta_title LIKE ? OR
+      story_text LIKE ? OR
+      tags LIKE ?
+    )
+    ORDER BY published_at DESC
+    LIMIT ?
+  `
+  const searchTerm = `%${params.query}%`
+  return await dbAll<Story>(db, sql, [searchTerm, searchTerm, searchTerm, params.limit || 5])
+}

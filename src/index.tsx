@@ -11,6 +11,7 @@ import { registerWebhookRoutes } from './routes/webhooks'
 import { registerAiRoutes } from './routes/ai'
 import { registerStoriesRoutes } from './features/stories/routes/stories'
 import { registerMcpRoutes } from './routes/mcp'
+import { registerUmbralRoutes } from './routes/umbral'
 
 const csrfMiddleware = csrf()
 
@@ -46,7 +47,9 @@ registerAdminRoutes(app)
 registerStudentRoutes(app)
 registerAiRoutes(app)
 registerStoriesRoutes(app)
+registerStoriesRoutes(app)
 registerMcpRoutes(app)
+registerUmbralRoutes(app)
 registerPublicRoutes(app)
 
 export default app
