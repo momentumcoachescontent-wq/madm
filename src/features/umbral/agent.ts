@@ -43,17 +43,14 @@ Usa Markdown. Sé solemne pero moderno. Habla como un oráculo cyberpunk.
 
 const TOOLS = [
     {
-        type: 'function',
+        type: 'function', // OpenAI format
         function: {
             name: 'search_stories',
             description: 'Busca historias de otros usuarios que coincidan con temas o palabras clave emocionales.',
             parameters: {
                 type: 'object',
                 properties: {
-                    query: {
-                        type: 'string',
-                        description: 'Palabras clave emocionales (ej: "traición", "miedo al éxito")',
-                    },
+                    query: { type: 'string', description: 'Palabras clave emocionales' },
                 },
                 required: ['query'],
             },
@@ -67,10 +64,7 @@ const TOOLS = [
             parameters: {
                 type: 'object',
                 properties: {
-                    slug: {
-                        type: 'string',
-                        description: 'El identificador único (slug) de la historia.',
-                    },
+                    slug: { type: 'string', description: 'El identificador único (slug)' },
                 },
                 required: ['slug'],
             },
@@ -89,15 +83,152 @@ const TOOLS = [
     },
 ]
 
+// --- OpenAI Client ---
+
+async function callOpenAI(env: CloudflareBindings, messages: any[], tools: any[]) {
+    if (!env.OPENAI_API_KEY) throw new Error('MISSING_KEY: OpenAI Key not found');
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: messages,
+            tools: tools,
+            tool_choice: 'auto',
+            temperature: 0.7
+        })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        const status = response.status;
+        throw new Error(`OPENAI_ERROR: ${status} - ${errorText}`);
+    }
+
+    const data: any = await response.json();
+    return data.choices[0].message;
+}
+
+// --- Gemini Client (REST) ---
+
+async function callGemini(env: CloudflareBindings, messages: any[], tools: any[]) {
+    if (!env.GEMINI_API_KEY) throw new Error('MISSING_KEY: Gemini Key not found');
+
+    // Convert messages to Gemini format
+    // OpenAI: { role: 'user'|'assistant'|'system', content: string }
+    // Gemini: contents: [{ role: 'user'|'model', parts: [{ text: string }] }]
+    // Note: Gemini doesn't support 'system' role in contents directly (it uses systemInstruction).
+    // For simplicity in this fallback, we'll prepend system prompt to first user message.
+
+    let geminiContents: any[] = [];
+    let systemInstructionText = "";
+
+    for (const m of messages) {
+        if (m.role === 'system') {
+            systemInstructionText += m.content + "\n";
+        } else if (m.role === 'user') {
+            geminiContents.push({ role: 'user', parts: [{ text: m.content }] });
+        } else if (m.role === 'assistant') {
+            geminiContents.push({ role: 'model', parts: [{ text: m.content || " " }] });
+        } else if (m.role === 'tool') {
+            // Gemini handles tool results differently (functionResponse).
+            // This fallback implementation is SIMPLIFIED. 
+            // If we are in a tool loop, it's complex to map.
+            // For now, if we have tool history, we might struggle. 
+            // Strategy: Flatten tool outputs into the next user message context if needed, 
+            // BUT proper mapping is:
+            // role: 'function', parts: [{ functionResponse: { ... } }]
+
+            // For MVP fallback: If history involves tools, we might just restart conversation context or simplify.
+            // Let's try basic mapping:
+            geminiContents.push({
+                role: 'function',
+                parts: [{
+                    functionResponse: {
+                        name: m.name || 'unknown_tool',
+                        response: { content: m.content } // Gemini expects object
+                    }
+                }]
+            });
+        }
+    }
+
+    // Prepend system instruction to first user message if no systemInstruction support in URL
+    // Actually v1beta supports systemInstruction.
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
+
+    // Simplistic Tool Mapping for Gemini
+    // Gemini tools format: { function_declarations: [...] } inside { tools: [...] }
+    const geminiTools = {
+        function_declarations: tools.map(t => ({
+            name: t.function.name,
+            description: t.function.description,
+            parameters: t.function.parameters
+        }))
+    };
+
+    const body: any = {
+        contents: geminiContents,
+        systemInstruction: { parts: [{ text: systemInstructionText || SYSTEM_PROMPT }] },
+        tools: [geminiTools],
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`GEMINI_ERROR: ${response.status} - ${errorText}`);
+    }
+
+    const data: any = await response.json();
+    const candidate = data.candidates?.[0];
+    const content = candidate?.content; // { role: 'model', parts: [...] }
+
+    // Map back to OpenAI format
+    const resultMessage: any = { role: 'assistant', content: null, tool_calls: [] };
+
+    if (content?.parts) {
+        for (const part of content.parts) {
+            if (part.text) {
+                resultMessage.content = (resultMessage.content || "") + part.text;
+            }
+            if (part.functionCall) {
+                resultMessage.tool_calls.push({
+                    id: 'gemini_call_' + Math.random().toString(36).substr(2, 9),
+                    function: {
+                        name: part.functionCall.name,
+                        arguments: JSON.stringify(part.functionCall.args)
+                    },
+                    type: 'function'
+                });
+            }
+        }
+    }
+
+    return resultMessage;
+}
+
+
+// --- Main Agent Logic ---
+
 export async function runAgent(
     env: CloudflareBindings,
     history: AgentMessage[]
 ): Promise<AgentMessage> {
-    if (!env.OPENAI_API_KEY) {
-        throw new Error('CONFIG_ERROR: OPENAI_API_KEY no está configurada.')
-    }
 
-    // Deep copy history and add system prompt
+    // Prepare messages with system prompt logic inside the loop or wrapper
+    // We keep the history cleaning outside.
+
+    // Deep copy for safety
     const messages: any[] = [
         { role: 'system', content: SYSTEM_PROMPT },
         ...history.map(m => ({
@@ -115,35 +246,33 @@ export async function runAgent(
     while (turns < maxTurns) {
         turns++
 
-        // 1. Call OpenAI
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: messages,
-                tools: TOOLS,
-                tool_choice: 'auto',
-                temperature: 0.7
-            })
-        })
+        let message: any;
 
-        if (!response.ok) {
-            const errorText = await response.text()
-            throw new Error(`OpenAI Error: ${response.status} - ${errorText}`)
+        // --- Provider Fallback Logic ---
+        try {
+            console.log('Trying OpenAI...');
+            message = await callOpenAI(env, messages, TOOLS);
+        } catch (e: any) {
+            const errStr = e.toString();
+            // Check for Quota (429) or Server Error (5xx)
+            if (errStr.includes("429") || errStr.includes("insufficient_quota") || errStr.includes("500") || errStr.includes("503")) {
+                console.warn(`OpenAI Failed (${errStr}). Switching to Gemini...`);
+                try {
+                    message = await callGemini(env, messages, TOOLS);
+                    // Mark message as coming from fallback if needed (optional)
+                } catch (geminiError: any) {
+                    throw new Error(`ALL_ORACLES_FAILED: OpenAI (${e.message}) | Gemini (${geminiError.message})`);
+                }
+            } else {
+                // If it's another error (e.g. auth), re-throw
+                throw e;
+            }
         }
-
-        const data: any = await response.json()
-        const choice = data.choices[0]
-        const message = choice.message
 
         // Add assistant message to history (for next turn)
         messages.push(message)
 
-        // 2. Check for tool calls
+        // Check for tool calls
         if (message.tool_calls && message.tool_calls.length > 0) {
             // Execute tools
             for (const toolCall of message.tool_calls) {
@@ -152,7 +281,7 @@ export async function runAgent(
                 let result = ''
 
                 try {
-                    const args = JSON.parse(argsStr)
+                    const args = typeof argsStr === 'string' ? JSON.parse(argsStr) : argsStr; // Gemini might return object already? No, we stringified it in adapter.
 
                     if (fnName === 'search_stories') {
                         const stories = await searchStories(env.DB, { query: args.query, limit: 3 })
@@ -180,12 +309,13 @@ export async function runAgent(
 
                 // Add tool result to history
                 messages.push({
-                    role: 'tool',
+                    role: 'tool', // OpenAI uses 'tool', Gemini 'function'
                     tool_call_id: toolCall.id,
+                    name: fnName, // Important for Gemini mapping context if we loop back
                     content: result
                 })
             }
-            // Loop again to give OpenAI the tool results
+            // Loop again to give LLM the tool results
         } else {
             // No tool calls, return final response
             return {

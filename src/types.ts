@@ -17,4 +17,5 @@ export type CloudflareBindings = {
   GA_MEASUREMENT_ID?: string
   MCP_API_KEY: string
   OPENAI_API_KEY: string
+  GEMINI_API_KEY: string
 }
