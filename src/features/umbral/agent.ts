@@ -43,7 +43,7 @@ Usa Markdown. Sé solemne pero moderno. Habla como un oráculo cyberpunk.
 
 const TOOLS = [
     {
-        type: 'function', // OpenAI format
+        type: 'function',
         function: {
             name: 'search_stories',
             description: 'Busca historias de otros usuarios que coincidan con temas o palabras clave emocionales.',
@@ -118,12 +118,6 @@ async function callOpenAI(env: CloudflareBindings, messages: any[], tools: any[]
 async function callGemini(env: CloudflareBindings, messages: any[], tools: any[]) {
     if (!env.GEMINI_API_KEY) throw new Error('MISSING_KEY: Gemini Key not found');
 
-    // Convert messages to Gemini format
-    // OpenAI: { role: 'user'|'assistant'|'system', content: string }
-    // Gemini: contents: [{ role: 'user'|'model', parts: [{ text: string }] }]
-    // Note: Gemini doesn't support 'system' role in contents directly (it uses systemInstruction).
-    // For simplicity in this fallback, we'll prepend system prompt to first user message.
-
     let geminiContents: any[] = [];
     let systemInstructionText = "";
 
@@ -135,35 +129,21 @@ async function callGemini(env: CloudflareBindings, messages: any[], tools: any[]
         } else if (m.role === 'assistant') {
             geminiContents.push({ role: 'model', parts: [{ text: m.content || " " }] });
         } else if (m.role === 'tool') {
-            // Gemini handles tool results differently (functionResponse).
-            // This fallback implementation is SIMPLIFIED. 
-            // If we are in a tool loop, it's complex to map.
-            // For now, if we have tool history, we might struggle. 
-            // Strategy: Flatten tool outputs into the next user message context if needed, 
-            // BUT proper mapping is:
-            // role: 'function', parts: [{ functionResponse: { ... } }]
-
-            // For MVP fallback: If history involves tools, we might just restart conversation context or simplify.
-            // Let's try basic mapping:
+            // Simplified tool handling for fallback
             geminiContents.push({
                 role: 'function',
                 parts: [{
                     functionResponse: {
                         name: m.name || 'unknown_tool',
-                        response: { content: m.content } // Gemini expects object
+                        response: { content: m.content }
                     }
                 }]
             });
         }
     }
 
-    // Prepend system instruction to first user message if no systemInstruction support in URL
-    // Actually v1beta supports systemInstruction.
-
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
 
-    // Simplistic Tool Mapping for Gemini
-    // Gemini tools format: { function_declarations: [...] } inside { tools: [...] }
     const geminiTools = {
         function_declarations: tools.map(t => ({
             name: t.function.name,
@@ -191,9 +171,8 @@ async function callGemini(env: CloudflareBindings, messages: any[], tools: any[]
 
     const data: any = await response.json();
     const candidate = data.candidates?.[0];
-    const content = candidate?.content; // { role: 'model', parts: [...] }
+    const content = candidate?.content;
 
-    // Map back to OpenAI format
     const resultMessage: any = { role: 'assistant', content: null, tool_calls: [] };
 
     if (content?.parts) {
@@ -225,10 +204,6 @@ export async function runAgent(
     history: AgentMessage[]
 ): Promise<AgentMessage> {
 
-    // Prepare messages with system prompt logic inside the loop or wrapper
-    // We keep the history cleaning outside.
-
-    // Deep copy for safety
     const messages: any[] = [
         { role: 'system', content: SYSTEM_PROMPT },
         ...history.map(m => ({
@@ -248,7 +223,6 @@ export async function runAgent(
 
         let message: any;
 
-        // --- Provider Fallback Logic ---
         try {
             console.log('Trying OpenAI...');
             message = await callOpenAI(env, messages, TOOLS);
@@ -259,13 +233,21 @@ export async function runAgent(
                 console.warn(`OpenAI Failed (${errStr}). Switching to Gemini...`);
                 try {
                     message = await callGemini(env, messages, TOOLS);
-                    // Mark message as coming from fallback if needed (optional)
                 } catch (geminiError: any) {
-                    throw new Error(`ALL_ORACLES_FAILED: OpenAI (${e.message}) | Gemini (${geminiError.message})`);
+                    // Return graceful failure message instead of throwing
+                    console.error(`ALL_ORACLES_FAILED: OpenAI (${e.message}) | Gemini (${geminiError.message})`);
+                    return {
+                        role: 'assistant',
+                        content: `**El Silencio ha caído.**\n\nMis oráculos están momentáneamente cegados por la niebla (Error de Conexión o Límites de Energía).\n\nNo fuerces la puerta ahora. *Respira. Reflexiona.* E inténtalo de nuevo más tarde, cuando la marea baje.`
+                    };
                 }
             } else {
-                // If it's another error (e.g. auth), re-throw
-                throw e;
+                // Return graceful failure for other errors too (Auth, etc)
+                console.error(`AGENT_ERROR: ${e.message}`);
+                return {
+                    role: 'assistant',
+                    content: `**Una perturbación en el Umbral.**\n\nAlgo impide nuestra conexión (${e.message}).\n\nVuelve a intentarlo en unos instantes.`
+                };
             }
         }
 
@@ -281,7 +263,7 @@ export async function runAgent(
                 let result = ''
 
                 try {
-                    const args = typeof argsStr === 'string' ? JSON.parse(argsStr) : argsStr; // Gemini might return object already? No, we stringified it in adapter.
+                    const args = typeof argsStr === 'string' ? JSON.parse(argsStr) : argsStr;
 
                     if (fnName === 'search_stories') {
                         const stories = await searchStories(env.DB, { query: args.query, limit: 3 })
