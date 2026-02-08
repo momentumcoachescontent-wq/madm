@@ -658,6 +658,88 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
               </div>
             </div>
 
+            {/* EL UMBRAL - DIAGNÓSTICO DE SOMBRA */}
+            <div id="el-umbral-app" style={{gridColumn: '1 / -1'}}>
+              <header className="header">
+                <h1 className="title">EL UMBRAL</h1>
+                <p className="subtitle">Diagnóstico de Sombra</p>
+              </header>
+
+              <section id="umbral-phase-1" className="phase active">
+                <div className="instruction">
+                  <p style={{marginBottom: '0.5rem'}}>El miedo te ha contado una historia. ¿Cuál de estas es la tuya hoy?</p>
+                  <small style={{display: 'block', color: 'var(--text-secondary)', marginBottom: '2rem'}}>Selecciona el escenario que resuene con tu bloqueo actual.</small>
+                </div>
+
+                <div className="cards-container">
+                  <div className="card" data-id="A">
+                    <div className="card-icon">👑</div>
+                    <h3>El Trono del Mártir</h3>
+                    <p>"Si yo no lo hago, todo se cae."</p>
+                    <div className="hover-text">Manipulación por CULPA. Buscas ser indispensable para comprar afecto.</div>
+                  </div>
+
+                  <div className="card" data-id="B">
+                    <div className="card-icon">🌫️</div>
+                    <h3>La Niebla de Gas</h3>
+                    <p>"Quizás estoy exagerando..."</p>
+                    <div className="hover-text">Manipulación por DUDA. Prefieres dudar de tu cordura a perder la conexión.</div>
+                  </div>
+
+                  <div className="card" data-id="C">
+                    <div className="card-icon">🏰</div>
+                    <h3>La Jaula de Oro</h3>
+                    <p>"Más vale malo conocido..."</p>
+                    <div className="hover-text">Manipulación por COMODIDAD. Tu talento se pudre en la seguridad mediocre.</div>
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="umbral-custom-input">O detalla tu propia situación:</label>
+                  <textarea id="umbral-custom-input" placeholder="Siento que mi voluntad está secuestrada cuando..."></textarea>
+                </div>
+
+                <button className="btn-primary" data-action="go-phase-2">CRUZAR EL UMBRAL</button>
+              </section>
+
+              <section id="umbral-phase-2" className="phase">
+                <div className="scanner-container">
+                  <div className="scanner-circle"></div>
+                  <div className="scanner-text" id="umbral-scanner-text">Iniciando escaneo...</div>
+                </div>
+              </section>
+
+              <section id="umbral-phase-3" className="phase">
+                <div className="result-header" style={{textAlign: 'center', marginBottom: '2rem'}}>
+                  <h2 style={{color: 'var(--accent-red)', fontFamily: 'var(--font-heading)'}}>DIAGNÓSTICO COMPLETADO</h2>
+                </div>
+
+                <div className="results-grid">
+                  <div className="result-card shadow-map">
+                    <h3>Mapa de tu Sombra</h3>
+                    <div id="umbral-shadow-content"></div>
+                  </div>
+
+                  <div className="result-card totem">
+                    <h3>El Tótem del Miedo</h3>
+                    <p className="explanation" style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Visualiza a tu enemigo. Copia este prompt para tu IA generadora de imágenes favorita.</p>
+                    <div className="prompt-box">
+                      <code id="umbral-totem-prompt"></code>
+                      <button className="btn-copy" data-action="copy" data-target="umbral-totem-prompt">Copiar</button>
+                    </div>
+                  </div>
+
+                  <div className="result-card decree">
+                    <h3>Decreto de Poder</h3>
+                    <p className="explanation" style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Guion para tu visualización de 30s. Repítelo frente al espejo.</p>
+                    <div className="script-box" id="umbral-decree-script"></div>
+                  </div>
+                </div>
+
+                <button className="btn-primary" data-action="reset">REINICIAR</button>
+              </section>
+            </div>
+
               <div className="resource-detail-card">
                 <div className="resource-icon">
                   <i className="fas fa-clipboard-check fa-4x"></i>
