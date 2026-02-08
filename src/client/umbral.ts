@@ -1,6 +1,7 @@
 // STATE
 let selectedScenario: string | null = null;
 let customInput = '';
+let scannerInterval: number | null = null;
 
 // DATA
 const DIAGNOSIS_DATA: Record<string, any> = {
@@ -96,6 +97,11 @@ function runScanner() {
     const scannerText = document.getElementById('umbral-scanner-text');
     if (!scannerText) return;
 
+    if (scannerInterval) {
+        clearInterval(scannerInterval);
+        scannerInterval = null;
+    }
+
     const steps = [
         "Iniciando enlace neural...",
         "Escaneando micro-expresiones...",
@@ -105,14 +111,15 @@ function runScanner() {
     ];
 
     let i = 0;
-    const interval = setInterval(() => {
+    scannerInterval = setInterval(() => {
         scannerText.innerText = steps[i];
         i++;
         if (i >= steps.length) {
-            clearInterval(interval);
+            if (scannerInterval) clearInterval(scannerInterval);
+            scannerInterval = null;
             setTimeout(goToPhase3, 1000);
         }
-    }, 800);
+    }, 800) as unknown as number;
 }
 
 function goToPhase3() {
@@ -166,6 +173,11 @@ function renderResults() {
 }
 
 function resetApp() {
+    if (scannerInterval) {
+        clearInterval(scannerInterval);
+        scannerInterval = null;
+    }
+
     selectedScenario = null;
     customInput = '';
 
@@ -184,7 +196,12 @@ function copyToClipboard(elementId: string) {
     if (!el) return;
 
     const text = el.innerText;
-    navigator.clipboard.writeText(text).then(() => {
-        alert("Copiado al portapapeles");
-    });
+    navigator.clipboard.writeText(text)
+        .then(() => {
+            alert("Copiado al portapapeles");
+        })
+        .catch((err) => {
+            console.error(err);
+            alert("Error al copiar al portapapeles");
+        });
 }
