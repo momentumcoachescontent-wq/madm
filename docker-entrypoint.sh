@@ -4,7 +4,7 @@ set -e
 # Fix permissions for runtime-writable directories
 # Iterating over a specific list avoids expensive recursive chown on /app
 for dir in .wrangler node_modules/.cache tmp logs uploads caches; do
-    if [ -e "/app/$dir" ]; then
+    if [ -d "/app/$dir" ] && [ ! -L "/app/$dir" ]; then
         chown -R appuser:appuser "/app/$dir"
     fi
 done
