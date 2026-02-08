@@ -5,6 +5,7 @@ services:
       - "8787:8787"
     volumes:
       # Persist the local Cloudflare simulation state (D1, R2, KV)
+      # IMPORTANT: Run ./scripts/setup-docker.sh before starting to ensure correct permissions
       - ./.wrangler:/app/.wrangler
       # Mount secrets file if needed (uncomment below)
       # - ./.dev.vars:/app/.dev.vars
