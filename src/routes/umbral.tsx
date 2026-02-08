@@ -204,7 +204,7 @@ export function registerUmbralRoutes(app: Hono<{ Bindings: CloudflareBindings }>
 
             } catch (err) {
               console.error(err);
-              addMessage('assistant', `** El Silencio Responde:** Hubo un error de conexión.\\n\\n\`\${err.message}\``);
+              addMessage('assistant', '**El Silencio Responde:** Hubo un error de conexión.\\n\\n\`' + err.message + '\`');
   } finally {
     typingIndicator.classList.remove('active');
     chatBox.scrollTop = chatBox.scrollHeight;
@@ -232,24 +232,24 @@ function addMessage(role, text) {
       </body >
       </html >
   `)
-    })
+  })
 
-    // API Route
-    // Note: Hono routes are relative to where they are mounted. 
-    // If mounted at /umbral, this post('/') matches /umbral/
-    // But strictly, we want the API to be distinct.
-    // Let's make it easy: use full path in app.route or just sub-route here.
+  // API Route
+  // Note: Hono routes are relative to where they are mounted. 
+  // If mounted at /umbral, this post('/') matches /umbral/
+  // But strictly, we want the API to be distinct.
+  // Let's make it easy: use full path in app.route or just sub-route here.
 
-    umbral.post('/api/umbral/chat', async (c) => {
-        try {
-            const body = await c.req.json()
-            // Logic handled in agent.ts
-            const response = await runAgent(c.env, body.history || [])
-            return c.json(response)
-        } catch (e: any) {
-            return c.json({ error: e.message }, 500)
-        }
-    })
+  umbral.post('/api/umbral/chat', async (c) => {
+    try {
+      const body = await c.req.json()
+      // Logic handled in agent.ts
+      const response = await runAgent(c.env, body.history || [])
+      return c.json(response)
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500)
+    }
+  })
 
-    app.route('/umbral', umbral)
+  app.route('/umbral', umbral)
 }
