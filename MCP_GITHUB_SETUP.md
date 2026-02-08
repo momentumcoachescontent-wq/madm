@@ -3,7 +3,7 @@
 ## Issue
 When trying to configure the GitHub MCP server, you may encounter the following error:
 
-```
+```text
 Error: exec: "docker": executable file not found in $PATH.
 ```
 
