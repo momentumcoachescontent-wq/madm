@@ -223,30 +223,22 @@ export async function runAgent(
 
         let message: any;
 
+        // --- Provider Fallback Logic: SAVINGS MODE (Gemini First) ---
         try {
-            console.log('Trying OpenAI...');
-            message = await callOpenAI(env, messages, TOOLS);
+            // Try Gemini (Cheaper/Free Tier) FIRST
+            console.log('Trying Gemini (Savings Mode)...');
+            message = await callGemini(env, messages, TOOLS);
         } catch (e: any) {
-            const errStr = e.toString();
-            // Check for Quota (429) or Server Error (5xx)
-            if (errStr.includes("429") || errStr.includes("insufficient_quota") || errStr.includes("500") || errStr.includes("503")) {
-                console.warn(`OpenAI Failed (${errStr}). Switching to Gemini...`);
-                try {
-                    message = await callGemini(env, messages, TOOLS);
-                } catch (geminiError: any) {
-                    // Return graceful failure message instead of throwing
-                    console.error(`ALL_ORACLES_FAILED: OpenAI (${e.message}) | Gemini (${geminiError.message})`);
-                    return {
-                        role: 'assistant',
-                        content: `**El Silencio ha caído.**\n\nMis oráculos están momentáneamente cegados por la niebla (Error de Conexión o Límites de Energía).\n\nNo fuerces la puerta ahora. *Respira. Reflexiona.* E inténtalo de nuevo más tarde, cuando la marea baje.`
-                    };
-                }
-            } else {
-                // Return graceful failure for other errors too (Auth, etc)
-                console.error(`AGENT_ERROR: ${e.message}`);
+            console.warn(`Gemini Failed (${e.message}). Switching to OpenAI Fallback...`);
+            try {
+                // Fallback to OpenAI (More Expensive) ONLY if Gemini fails
+                message = await callOpenAI(env, messages, TOOLS);
+            } catch (openaiError: any) {
+                // Return graceful failure message if BOTH fail
+                console.error(`ALL_ORACLES_FAILED: Gemini (${e.message}) | OpenAI (${openaiError.message})`);
                 return {
                     role: 'assistant',
-                    content: `**Una perturbación en el Umbral.**\n\nAlgo impide nuestra conexión (${e.message}).\n\nVuelve a intentarlo en unos instantes.`
+                    content: `**El Silencio ha caído.**\n\nMis oráculos están momentáneamente cegados por la niebla (Error de Conexión o Límites de Energía).\n\nNo fuerces la puerta ahora. *Respira. Reflexiona.* E inténtalo de nuevo más tarde, cuando la marea baje.`
                 };
             }
         }
