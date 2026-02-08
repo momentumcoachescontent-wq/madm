@@ -4,3 +4,13 @@ build/
 .wrangler/
 *.log
 .DS_Store
+
+# Secrets and Local Config
+.env
+.env.*.local
+*.local.json
+mcp.local.json
+.vscode/*.local*
+SECRET_KEY
+*.pem
+*.key
