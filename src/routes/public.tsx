@@ -621,45 +621,11 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
     )
   })
 
-  // Página: Recursos Gratuitos
-  publicRoutes.get('/recursos-gratuitos', (c) => {
+  // Página: El Umbral (Standalone Tool)
+  publicRoutes.get('/el-umbral', (c) => {
     return c.render(
-      <div>
-        <HeroSection
-          title="Recursos Gratuitos"
-          subtitle="Empieza a ir más allá del miedo incluso si hoy no puedes invertir dinero"
-          variant="small"
-        />
-
-        <section className="section">
-          <div className="container">
-            <div className="intro-box">
-              <p>
-                Creemos que todos merecen acceso a herramientas de crecimiento emocional.
-                Por eso hemos creado estos recursos 100% gratuitos para que comiences tu
-                transformación hoy mismo.
-              </p>
-            </div>
-
-            <div className="resources-list">
-            {/* New AI Tool Banner */}
-            <div style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); border-radius: 12px; padding: 30px; margin-bottom: 50px; color: white; display: flex; align-items: center; gap: 30px; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3); flex-wrap: wrap;">
-              <div style="flex: 0 0 80px; text-align: center;">
-                 <i className="fas fa-robot fa-4x"></i>
-              </div>
-              <div style="flex: 1; min-width: 250px;">
-                 <h3 style="font-size: 1.5rem; margin-bottom: 10px; color: white;">Nuevo: Analiza tu caso con IA</h3>
-                 <p style="opacity: 0.9;">Cuéntale tu situación a nuestro asistente inteligente y recibe un análisis inmediato y recomendaciones personalizadas.</p>
-              </div>
-              <div>
-                 <a href="/asistente-ia" target="_blank" rel="noopener noreferrer" className="btn btn-light">
-                   <i className="fas fa-arrow-right"></i> Probar Ahora
-                 </a>
-              </div>
-            </div>
-
-            {/* EL UMBRAL - DIAGNÓSTICO DE SOMBRA */}
-            <div id="el-umbral-app" style={{gridColumn: '1 / -1'}}>
+      <div className="container section">
+        <div id="el-umbral-app" style={{margin: '0 auto'}}>
               <header className="header">
                 <h1 className="title">EL UMBRAL</h1>
                 <p className="subtitle">Diagnóstico de Sombra</p>
@@ -738,7 +704,52 @@ export function registerPublicRoutes(app: Hono<{ Bindings: CloudflareBindings }>
 
                 <button className="btn-primary" data-action="reset">REINICIAR</button>
               </section>
+        </div>
+      </div>
+    )
+  })
+
+  // Página: Recursos Gratuitos
+  publicRoutes.get('/recursos-gratuitos', (c) => {
+    return c.render(
+      <div>
+        <HeroSection
+          title="Recursos Gratuitos"
+          subtitle="Empieza a ir más allá del miedo incluso si hoy no puedes invertir dinero"
+          variant="small"
+        />
+
+        <section className="section">
+          <div className="container">
+            <div className="intro-box">
+              <p>
+                Creemos que todos merecen acceso a herramientas de crecimiento emocional.
+                Por eso hemos creado estos recursos 100% gratuitos para que comiences tu
+                transformación hoy mismo.
+              </p>
             </div>
+
+            <div className="resources-list">
+            {/* New AI Tool Banner */}
+            <div style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); border-radius: 12px; padding: 30px; margin-bottom: 50px; color: white; display: flex; align-items: center; gap: 30px; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3); flex-wrap: wrap;">
+              <div style="flex: 0 0 80px; text-align: center;">
+                 <i className="fas fa-robot fa-4x"></i>
+              </div>
+              <div style="flex: 1; min-width: 250px;">
+                 <h3 style="font-size: 1.5rem; margin-bottom: 10px; color: white;">Nuevo: Analiza tu caso con IA</h3>
+                 <p style="opacity: 0.9;">Cuéntale tu situación a nuestro asistente inteligente y recibe un análisis inmediato y recomendaciones personalizadas.</p>
+              </div>
+              <div>
+                 <a href="/asistente-ia" target="_blank" rel="noopener noreferrer" className="btn btn-light">
+                   <i className="fas fa-arrow-right"></i> Probar Ahora
+                 </a>
+              </div>
+            </div>
+
+            {/* EL UMBRAL - BANNER */}
+            <a href="/el-umbral" target="_blank" className="umbral-banner" style={{gridColumn: '1 / -1'}}>
+              <h2>Atréve-te a explorar el umbral y sorpréndete</h2>
+            </a>
 
               <div className="resource-detail-card">
                 <div className="resource-icon">
