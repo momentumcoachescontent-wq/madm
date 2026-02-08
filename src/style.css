@@ -2314,3 +2314,38 @@ a:hover {
     font-size: 2rem;
     font-family: var(--font-heading, serif);
 }
+
+/* ===== AI BANNER ===== */
+.ai-banner {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  border-radius: 12px;
+  padding: 30px;
+  margin-bottom: 50px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+}
+
+.ai-banner-icon {
+  flex: 0 0 80px;
+  text-align: center;
+}
+
+.ai-banner-content {
+  flex: 1;
+  min-width: 250px;
+}
+
+.ai-banner-content h3 {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+  color: white;
+}
+
+.ai-banner-content p {
+  opacity: 0.9;
+}
