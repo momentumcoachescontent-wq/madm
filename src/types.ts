@@ -15,4 +15,5 @@ export type CloudflareBindings = {
   MAX_UPLOAD_BYTES?: string
   MEDIA_ORIGIN?: string
   GA_MEASUREMENT_ID?: string
+  MCP_API_KEY: string
 }

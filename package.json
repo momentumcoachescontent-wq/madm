@@ -26,6 +26,7 @@
     "@jsquash/jpeg": "^1.6.0",
     "@jsquash/png": "^3.1.1",
     "@jsquash/resize": "^2.1.1",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@paypal/paypal-server-sdk": "^2.1.0",
     "@types/diff": "^7.0.2",
     "bcryptjs": "^3.0.3",
@@ -34,7 +35,8 @@
     "hono": "^4.10.7",
     "stripe": "^20.1.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "xss": "^1.0.15"
+    "xss": "^1.0.15",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250705.0",

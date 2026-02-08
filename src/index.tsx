@@ -10,6 +10,7 @@ import { registerApiRoutes } from './routes/api'
 import { registerWebhookRoutes } from './routes/webhooks'
 import { registerAiRoutes } from './routes/ai'
 import { registerStoriesRoutes } from './features/stories/routes/stories'
+import { registerMcpRoutes } from './routes/mcp'
 
 const csrfMiddleware = csrf()
 
@@ -33,7 +34,7 @@ app.use(
 app.use(renderer)
 
 app.use(async (c, next) => {
-  if (c.req.path.startsWith('/api/webhooks')) {
+  if (c.req.path.startsWith('/api/webhooks') || c.req.path.startsWith('/api/mcp')) {
     return next()
   }
   return csrfMiddleware(c, next)
@@ -45,6 +46,7 @@ registerAdminRoutes(app)
 registerStudentRoutes(app)
 registerAiRoutes(app)
 registerStoriesRoutes(app)
+registerMcpRoutes(app)
 registerPublicRoutes(app)
 
 export default app
