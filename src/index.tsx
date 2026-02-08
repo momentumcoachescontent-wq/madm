@@ -35,7 +35,7 @@ app.use(
 app.use(renderer)
 
 app.use(async (c, next) => {
-  if (c.req.path.startsWith('/api/webhooks') || c.req.path.startsWith('/api/mcp')) {
+  if (c.req.path.startsWith('/api/webhooks') || c.req.path.startsWith('/api/mcp') || c.req.path.includes('/api/umbral')) {
     return next()
   }
   return csrfMiddleware(c, next)
