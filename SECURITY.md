@@ -6,7 +6,14 @@ We take the security of this project seriously. If you discover a security vulne
 
 **DO NOT** create a public issue for security vulnerabilities.
 
-Please report security issues to the project maintainers via email (if available) or by contacting the organization administrators directly.
+Please report security issues to the project maintainers via email at **security@masalladelmiedo.com** (or **soporte@masalladelmiedo.com**).
+
+When reporting a vulnerability, please include:
+1.  A description of the issue.
+2.  Steps to reproduce the issue.
+3.  The potential impact of the vulnerability.
+
+We aim to acknowledge receipt of all reports within 48 hours.
 
 ## Supported Versions
 
