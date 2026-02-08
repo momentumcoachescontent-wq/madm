@@ -315,6 +315,31 @@ curl https://mas-alla-del-miedo.pages.dev
 
 ---
 
+## 🐳 Docker Setup
+
+This project uses Docker to provide a consistent development environment.
+
+### Prerequisites
+- Docker and Docker Compose installed
+
+### Running with Docker
+
+1. **Run the setup script**:
+   Before starting the container, run the setup script to ensure the `.wrangler` directory exists with correct permissions. This prevents permission errors related to the volume mount.
+
+   ```bash
+   chmod +x scripts/setup-docker.sh
+   ./scripts/setup-docker.sh
+   ```
+
+2. **Start the container**:
+   ```bash
+   docker-compose up --build
+   ```
+   The application will be available at `http://localhost:8787`.
+
+---
+
 ## 🚀 Estado del Despliegue
 
 ### ✅ Producción
