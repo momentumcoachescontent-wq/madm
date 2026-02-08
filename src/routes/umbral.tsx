@@ -5,11 +5,11 @@ import { runAgent, AgentMessage } from '../features/umbral/agent'
 import { html } from 'hono/html'
 
 export function registerUmbralRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
-    const umbral = new Hono<{ Bindings: CloudflareBindings }>()
+  const umbral = new Hono<{ Bindings: CloudflareBindings }>()
 
-    // UI Route
-    umbral.get('/', (c) => {
-        return c.html(html`
+  // UI Route
+  umbral.get('/', (c) => {
+    return c.html(html`
       <!DOCTYPE html>
       <html lang="es">
       <head>
@@ -189,7 +189,10 @@ export function registerUmbralRoutes(app: Hono<{ Bindings: CloudflareBindings }>
                 })
               });
 
-              if (!response.ok) throw new Error('Error en el oráculo');
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || \`Error en el oráculo (\${response.status})\`);
+              }
 
               const data = await response.json();
               if (data.error) throw new Error(data.error);
@@ -201,33 +204,34 @@ export function registerUmbralRoutes(app: Hono<{ Bindings: CloudflareBindings }>
 
             } catch (err) {
               console.error(err);
-              addMessage('assistant', 'El silencio responde. Hubo un error de conexión: ' + err.message);
-            } finally {
-              typingIndicator.classList.remove('active');
-              chatBox.scrollTop = chatBox.scrollHeight;
-            }
+              addMessage('assistant', `** El Silencio Responde:** Hubo un error de conexión.\\n\\n\`\${err.message}\``);
+  } finally {
+    typingIndicator.classList.remove('active');
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+}
           }
 
-          function addMessage(role, text) {
-            const div = document.createElement('div');
-            div.className = 'message ' + role;
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'prose';
-            
-            if (role === 'assistant') {
-              contentDiv.innerHTML = marked.parse(text);
-            } else {
-              contentDiv.textContent = text;
-            }
+function addMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
 
-            div.appendChild(contentDiv);
-            chatBox.appendChild(div);
-          }
-        </script>
-      </body>
-      </html>
-    `)
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'prose';
+
+  if (role === 'assistant') {
+    contentDiv.innerHTML = marked.parse(text);
+  } else {
+    contentDiv.textContent = text;
+  }
+
+  div.appendChild(contentDiv);
+  chatBox.appendChild(div);
+}
+        </script >
+      </body >
+      </html >
+  `)
     })
 
     // API Route
