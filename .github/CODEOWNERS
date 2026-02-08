@@ -1,0 +1,8 @@
+# GitHub Actions
+.github/workflows/* @madm25
+
+# MCP Documentation
+docs/mcp/* @madm25
+
+# Security
+SECURITY.md @madm25

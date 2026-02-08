@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "github-remote": {
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${input:github_mcp_pat}"
+      }
+    },
+    "github-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:github_mcp_pat}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "github_mcp_pat",
+      "description": "Enter your GitHub Personal Access Token (Fine-grained PAT recommended)",
+      "default": "",
+      "type": "promptString"
+    }
+  ]
+}
