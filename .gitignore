@@ -14,3 +14,4 @@ mcp.local.json
 SECRET_KEY
 *.pem
 *.key
+.dev.vars
