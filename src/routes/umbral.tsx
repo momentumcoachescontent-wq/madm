@@ -5,10 +5,9 @@ import { runAgent, AgentMessage } from '../features/umbral/agent'
 import { html } from 'hono/html'
 
 export function registerUmbralRoutes(app: Hono<{ Bindings: CloudflareBindings }>) {
-  const umbral = new Hono<{ Bindings: CloudflareBindings }>()
 
-  // UI Route
-  umbral.get('/', (c) => {
+  // UI Route - Mounted directly on /umbral
+  app.get('/umbral', (c) => {
     return c.html(html`
       <!DOCTYPE html>
       <html lang="es">
@@ -181,7 +180,7 @@ export function registerUmbralRoutes(app: Hono<{ Bindings: CloudflareBindings }>
               // Current turn
               const currentTurn = { role: 'user', content: text };
               
-              const response = await fetch('/umbral/api/umbral/chat', {
+              const response = await fetch('/api/umbral/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -191,7 +190,7 @@ export function registerUmbralRoutes(app: Hono<{ Bindings: CloudflareBindings }>
 
               if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || \`Error en el oráculo (\${response.status})\`);
+                throw new Error(errorData.error || 'Error en el oráculo (' + response.status + ')');
               }
 
               const data = await response.json();
@@ -205,51 +204,44 @@ export function registerUmbralRoutes(app: Hono<{ Bindings: CloudflareBindings }>
             } catch (err) {
               console.error(err);
               addMessage('assistant', '**El Silencio Responde:** Hubo un error de conexión.\\n\\n\`' + err.message + '\`');
-  } finally {
-    typingIndicator.classList.remove('active');
-    chatBox.scrollTop = chatBox.scrollHeight;
-  }
-}
+            } finally {
+              typingIndicator.classList.remove('active');
+              chatBox.scrollTop = chatBox.scrollHeight;
+            }
           }
 
-function addMessage(role, text) {
-  const div = document.createElement('div');
-  div.className = 'message ' + role;
+          function addMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = 'message ' + role;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'prose';
+            
+            if (role === 'assistant') {
+              contentDiv.innerHTML = marked.parse(text);
+            } else {
+              contentDiv.textContent = text;
+            }
 
-  const contentDiv = document.createElement('div');
-  contentDiv.className = 'prose';
-
-  if (role === 'assistant') {
-    contentDiv.innerHTML = marked.parse(text);
-  } else {
-    contentDiv.textContent = text;
-  }
-
-  div.appendChild(contentDiv);
-  chatBox.appendChild(div);
-}
-        </script >
-      </body >
-      </html >
-  `)
+            div.appendChild(contentDiv);
+            chatBox.appendChild(div);
+          }
+        </script>
+      </body>
+      </html>
+    `)
   })
 
-  // API Route
-  // Note: Hono routes are relative to where they are mounted. 
-  // If mounted at /umbral, this post('/') matches /umbral/
-  // But strictly, we want the API to be distinct.
-  // Let's make it easy: use full path in app.route or just sub-route here.
-
-  umbral.post('/api/umbral/chat', async (c) => {
+  // API Route - Mounted directly on /api/umbral/chat to avoid path ambiguity
+  app.post('/api/umbral/chat', async (c) => {
     try {
       const body = await c.req.json()
       // Logic handled in agent.ts
       const response = await runAgent(c.env, body.history || [])
       return c.json(response)
     } catch (e: any) {
-      return c.json({ error: e.message }, 500)
+      console.error('Umbral Agent Error:', e);
+      return c.json({ error: e.message || 'Error interno del agente' }, 500)
     }
   })
-
-  app.route('/umbral', umbral)
 }
