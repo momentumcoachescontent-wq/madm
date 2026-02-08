@@ -1,12 +1,6 @@
 import { Hono } from "hono";
 import { CloudflareBindings } from "../types";
 import { createMcpServer } from "../features/mcp/server";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-
-// Note: Using SSEServerTransport directly for cleaner separation of SSE and POST
-// But wait, the standard approach for Hono/Workers is likely custom SSE logic or WebStandardStreamableHTTPServerTransport if available.
-// Since WebStandardStreamableHTTPServerTransport is available, let's use it as it handles the full lifecycle.
-
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
 export const registerMcpRoutes = (app: Hono<{ Bindings: CloudflareBindings }>) => {
@@ -22,7 +16,30 @@ export const registerMcpRoutes = (app: Hono<{ Bindings: CloudflareBindings }>) =
         return c.json({ error: "Configuration Error" }, 500);
     }
 
-    if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.slice(7) !== apiKey) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const providedKey = authHeader.slice(7);
+
+    // Constant-time comparison using SHA-256
+    const encoder = new TextEncoder();
+    const providedHash = await crypto.subtle.digest("SHA-256", encoder.encode(providedKey));
+    const storedHash = await crypto.subtle.digest("SHA-256", encoder.encode(apiKey));
+
+    const providedHashArray = new Uint8Array(providedHash);
+    const storedHashArray = new Uint8Array(storedHash);
+
+    if (providedHashArray.length !== storedHashArray.length) {
+       return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    let equal = 0;
+    for (let i = 0; i < providedHashArray.length; i++) {
+      equal |= providedHashArray[i] ^ storedHashArray[i];
+    }
+
+    if (equal !== 0) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
@@ -34,7 +51,8 @@ export const registerMcpRoutes = (app: Hono<{ Bindings: CloudflareBindings }>) =
   // The WebStandardStreamableHTTPServerTransport handles both.
   mcp.all("/", async (c) => {
     const transport = new WebStandardStreamableHTTPServerTransport();
-    const server = createMcpServer(c.env);
+    // Pass a static identifier for the single API key for now
+    const server = createMcpServer(c.env, "primary-env-key");
 
     await server.connect(transport);
 

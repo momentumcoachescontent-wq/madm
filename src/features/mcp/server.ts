@@ -1,8 +1,8 @@
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CloudflareBindings } from "../../types";
 
-export function createMcpServer(bindings: CloudflareBindings) {
+export function createMcpServer(bindings: CloudflareBindings, callerId: string = "unknown") {
   const server = new McpServer({
     name: "Mas Alla Del Miedo API",
     version: "1.0.0",
@@ -81,8 +81,11 @@ export function createMcpServer(bindings: CloudflareBindings) {
       slug: z.string().describe("The slug of the story to retrieve"),
     },
     async ({ slug }) => {
+      // Explicit column selection
       const story = await bindings.DB.prepare(
-        "SELECT * FROM stories WHERE slug = ?"
+        `SELECT id, title, slug, excerpt, story_text, published_at, thumbnail_url, meta_title, meta_author, tags, views, likes
+         FROM stories
+         WHERE slug = ?`
       )
         .bind(slug)
         .first();
@@ -117,8 +120,11 @@ export function createMcpServer(bindings: CloudflareBindings) {
           slug: z.string().describe("The slug of the course to retrieve"),
         },
         async ({ slug }) => {
+          // Explicit column selection
           const course = await bindings.DB.prepare(
-            "SELECT * FROM courses WHERE slug = ?"
+            `SELECT id, title, slug, price, currency, description, published
+             FROM courses
+             WHERE slug = ?`
           )
             .bind(slug)
             .first();
@@ -163,39 +169,71 @@ export function createMcpServer(bindings: CloudflareBindings) {
       email: z.string().email().describe("The email of the student"),
     },
     async ({ email }) => {
-      const user = await bindings.DB.prepare(
-        "SELECT id, first_name, last_name, email FROM users WHERE email = ?"
-      )
-        .bind(email)
-        .first();
+      let status = "success";
+      let user = null;
+      let enrollments = [];
 
-      if (!user) {
+      try {
+        user = await bindings.DB.prepare(
+          "SELECT id, first_name, last_name, email FROM users WHERE email = ?"
+        )
+          .bind(email)
+          .first();
+
+        if (!user) {
+          status = "user_not_found";
+        } else {
+          // Get enrollments
+          const result = await bindings.DB.prepare(
+            `SELECT c.title as course_title, e.created_at, e.payment_status
+             FROM enrollments e
+             JOIN courses c ON e.course_id = c.id
+             WHERE e.user_id = ?`
+          )
+            .bind(user.id)
+            .all();
+          enrollments = result.results;
+        }
+      } catch (error) {
+        status = "error";
+        console.error("Error in get_student_progress:", error);
+      }
+
+      // Record audit entry
+      try {
+        await bindings.DB.prepare(
+          `INSERT INTO mcp_audit_logs (caller_id, tool_name, requested_email, status)
+           VALUES (?, 'get_student_progress', ?, ?)`
+        )
+          .bind(callerId, email, status)
+          .run();
+      } catch (logError) {
+        console.error("Failed to write audit log:", logError);
+      }
+
+      if (status !== "success") {
         return {
           content: [
             {
               type: "text",
-              text: "User not found",
+              text: status === "user_not_found" ? "User not found" : "Internal error",
             },
           ],
           isError: true,
         };
       }
 
-      // Get enrollments
-      const { results: enrollments } = await bindings.DB.prepare(
-        `SELECT c.title as course_title, e.created_at, e.payment_status
-         FROM enrollments e
-         JOIN courses c ON e.course_id = c.id
-         WHERE e.user_id = ?`
-      )
-        .bind(user.id)
-        .all();
+      // Sanitize user object (remove sensitive fields like email, id)
+      const sanitizedUser = {
+        first_name: user?.first_name,
+        last_name: user?.last_name,
+      };
 
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ user, enrollments }, null, 2),
+            text: JSON.stringify({ user: sanitizedUser, enrollments }, null, 2),
           },
         ],
       };

@@ -8,9 +8,11 @@ const mockD1 = {
     bind: vi.fn(() => ({
       all: vi.fn(),
       first: vi.fn(),
+      run: vi.fn(),
     })),
     all: vi.fn(),
     first: vi.fn(),
+    run: vi.fn(),
   })),
 }
 
@@ -33,6 +35,17 @@ const mockBindings: CloudflareBindings = {
 describe('MCP Server', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Explicitly restore default implementation to avoid leakage
+    mockD1.prepare.mockImplementation(() => ({
+      bind: vi.fn(() => ({
+        all: vi.fn(),
+        first: vi.fn(),
+        run: vi.fn(),
+      })),
+      all: vi.fn(),
+      first: vi.fn(),
+      run: vi.fn(),
+    } as any))
   })
 
   it('should return 401 if no API key is provided', async () => {
@@ -112,10 +125,17 @@ describe('MCP Server', () => {
   it('should execute search_stories tool', async () => {
     // Mock DB response
     const mockResults = [{ id: 1, title: 'Test Story', slug: 'test-story', excerpt: 'Foo' }]
+
+    // Override implementation for this test
     mockD1.prepare.mockImplementation(() => ({
       bind: vi.fn(() => ({
         all: vi.fn().mockResolvedValue({ results: mockResults }),
+        first: vi.fn(),
+        run: vi.fn(),
       })),
+      all: vi.fn(),
+      first: vi.fn(),
+      run: vi.fn(),
     } as any))
 
     const rpcRequest = {
