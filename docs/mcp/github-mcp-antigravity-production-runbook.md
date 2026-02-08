@@ -93,7 +93,7 @@ Construct your Fine-grained PAT with *only* the permissions required for your sp
 
 ### A. Local MCP (npx) - Antigravity Compatible
 
-Add this to your MCP client configuration (e.g., `mcp-config.json` or VS Code `settings.json`):
+Add this to your MCP client configuration (e.g., `.vscode/mcp.json` or VS Code `settings.json`):
 
 ```json
 {
@@ -168,7 +168,8 @@ Perform these steps to verify the integration is working securely:
     *   [ ] Check "Require status checks to pass before merging".
 2.  [ ] **Settings > Actions > General:**
     *   [ ] Select "Allow select actions and reusable workflows".
-    *   [ ] Select "Read and write permissions" (only if necessary for workflows, otherwise Read-only).
+    *   [ ] Select "Read repository contents (read-only)" as the default.
+    *   [ ] *Note:* Workflows needing write access must request elevated rights explicitly using the `permissions:` key in the workflow YAML.
 3.  [ ] **Settings > Code security and analysis:**
     *   [ ] Enable "Dependabot alerts".
     *   [ ] Enable "Dependabot security updates".
