@@ -58,7 +58,7 @@ export const renderer = jsxRenderer(({ children }, c: Context<{ Bindings: Cloudf
           /* Floating Toggle Button */
           .umbral-toggle {
             position: fixed;
-            bottom: 30px;
+            bottom: 110px;
             right: 30px;
             width: 60px;
             height: 60px;
